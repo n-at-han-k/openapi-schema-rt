@@ -65,6 +65,14 @@ components:
             $ref: '#/components/schemas/justMessage'
           example:
             message: Unauthorized
+    "403":
+      description: No permission
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/justMessage'
+          example:
+            message: No permission to create tickets in the queue 'myqueue'
     "404":
       description: The resource wasnt found.
       content:
@@ -1606,6 +1614,8 @@ paths:
               operationId: ticket_id_get
               parameters:
                 id: $response.body#/id
+        "403":
+          $ref: '#/components/responses/403'
         "400":
           $ref: '#/components/responses/400'
         default:
