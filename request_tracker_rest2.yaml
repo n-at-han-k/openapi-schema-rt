@@ -838,6 +838,13 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/jsonSearch'
+            examples:
+              usersByName:
+                description: Searching for a user by name
+                value:
+                  - field: Name
+                    value: userid
+                    operator: LIKE
       responses:
         "200":
           description: Search successful
