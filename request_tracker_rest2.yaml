@@ -6,7 +6,7 @@ openapi: "3.1.0"
 info:
   title: Request Tracker REST2
   description: Partial specification of Request Tracker's REST2 API.
-  version: "0.1.0"
+  version: "0.2.1"
   contact:
     name: Iisakki Jaakkola
     email: iihaja@utu.fi
