@@ -10,7 +10,7 @@ Not even close. I've been adding paths as I need them.
 
 ## License
 
-SPDX-License-Identifier: GPL-2.0-or-later
+SPDX-License-Identifier: LGPL-2.0-or-later
 
 
 # Development

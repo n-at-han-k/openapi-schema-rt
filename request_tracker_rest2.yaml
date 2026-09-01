@@ -689,7 +689,7 @@ components:
       descrtiption: A date-time string which may be undefined. Which RT expresses as unix timestamp zero.
         I.e. the start of 1970. So you probably want to compare these values to it.
         It appears like only UTC times are supported.
-        So returned times are always in UTC and uploading times with a timezone componenet other than Z will fail silently.
+        So returned times are always in UTC and uploading times with a timezone component other than Z will fail silently.
       type: string
       format: date-time
       example: 1970-01-01T00:00:00Z
@@ -702,7 +702,7 @@ components:
         # false
         - 0
     perlBoolean:
-      description: RT doesnt bother to translate perl boolean value to JSON.
+      description: RT doesn't bother to translate perl boolean value to JSON.
       type: string
       enum:
         # true
@@ -1867,7 +1867,7 @@ paths:
                         type: string
                         # Essentially just a Perl Boolean.
                         enum:
-                          # single valued 
+                          # single valued
                           - "1"
                           # multiple valued
                           - "0"
@@ -1908,7 +1908,7 @@ paths:
                         Note that not all custom field types support multiple values.
                       # Essentially just a Perl Boolean.
                       enum:
-                        # single valued 
+                        # single valued
                         - "1"
                         # multiple valued
                         - "0"
