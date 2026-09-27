@@ -40,3 +40,6 @@ build/
 # bundler's own, when someone runs bundle outside the nix shell
 /.bundle/
 /vendor/
+
+# The token. .env.example is the template.
+/.env

@@ -1,0 +1,107 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+#
+# Remove everything the conformance suite has ever made.
+#
+# The suite names everything it creates `conf-...`, and cleans up after
+# itself -- but only what it tracked. The examples that exercise a CREATE
+# make objects of their own, and a run that dies halfway makes some too. This
+# finds them all by name and takes them down.
+#
+#   bin/scrub-scratch          # say what it would remove
+#   bin/scrub-scratch --force  # remove it
+#
+# Reads RT_URL and RT_TOKEN from .env, same as the suite.
+
+require 'json'
+require 'net/http'
+require 'uri'
+
+require 'dotenv'
+
+Dotenv.load(File.expand_path('../.env', __dir__))
+
+URL   = ENV.fetch('RT_URL')
+TOKEN = ENV.fetch('RT_TOKEN')
+BASE  = "#{URL}/REST/2.0"
+FORCE = ARGV.include?('--force')
+
+# A name only the suite would have chosen. `conformance-` is what the first
+# version of it used, before RT's 32-character limit on a lifecycle name.
+MINE = /\A(conf-|conformance-)/
+
+def call(method, path, body = nil)
+  uri = URI.parse(BASE + path)
+  request = Net::HTTP.const_get(method.capitalize).new(uri)
+  request['Authorization'] = "token #{TOKEN}"
+  request['Accept'] = 'application/json'
+
+  if body
+    request['Content-Type'] = 'application/json'
+    request.body = JSON.dump(body)
+  end
+
+  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') { |http|
+    http.request(request)
+  }
+
+  [response.code, (JSON.parse(response.body) rescue nil)]
+end
+
+def search(path, body)
+  _, found = call('POST', "#{path}?per_page=100&fields=Name,Disabled,Status", body)
+  found.is_a?(Hash) ? Array(found['items']) : []
+end
+
+ALL = [{ 'field' => 'id', 'operator' => '>', 'value' => 0 }].freeze
+
+# type => [how to list them, how to remove one]
+KINDS = {
+  'ticket'      => [-> { search('/tickets', ALL) },
+                    ->(i) { call('PUT', "/ticket/#{i['id']}", { 'Status' => 'deleted' }) }],
+  'asset'       => [-> { search('/assets', ALL) },
+                    ->(i) { call('PUT', "/asset/#{i['id']}", { 'Status' => 'deleted' }) }],
+  'article'     => [-> { search('/articles', ALL) },
+                    ->(i) { call('DELETE', "/article/#{i['id']}") }],
+  'customfield' => [-> { search('/customfields', ALL) },
+                    ->(i) { call('DELETE', "/customfield/#{i['id']}") }],
+  'queue'       => [-> { (call('GET', '/queues/all?per_page=100&fields=Name,Disabled')[1] || {})['items'] || [] },
+                    ->(i) { call('DELETE', "/queue/#{i['id']}") }],
+  'catalog'     => [-> { (call('GET', '/catalogs/all?per_page=100&fields=Name,Disabled')[1] || {})['items'] || [] },
+                    ->(i) { call('DELETE', "/catalog/#{i['id']}") }],
+  'class'       => [-> { (call('GET', '/classes/all?per_page=100&fields=Name,Disabled')[1] || {})['items'] || [] },
+                    ->(i) { call('DELETE', "/class/#{i['id']}") }],
+  'group'       => [-> { search('/groups', ALL) },
+                    ->(i) { call('DELETE', "/group/#{i['id']}") }],
+  'user'        => [-> { search('/users', ALL) },
+                    ->(i) { call('DELETE', "/user/#{i['id']}") }],
+  'lifecycle'   => [-> { (call('GET', '/lifecycles?per_page=100')[1] || []).map { |l| l.is_a?(Hash) ? { 'id' => l['name'], 'Name' => l['name'] } : nil }.compact },
+                    ->(i) { call('DELETE', "/lifecycle/#{i['id']}") }]
+}.freeze
+
+total = 0
+
+KINDS.each do |kind, (list, remove)|
+  mine = list.call.select { |item|
+    name = item['Name'] || item['Subject'] || item['id']
+    name.to_s.match?(MINE) && item['Disabled'].to_s != '1' && item['Status'].to_s != 'deleted'
+  }
+
+  next if mine.empty?
+
+  puts "#{kind}: #{mine.size}"
+  mine.each do |item|
+    label = "  #{item['id']} #{item['Name'] || item['Subject']}"
+
+    if FORCE
+      status, = remove.call(item)
+      puts "#{label} -> #{status}"
+    else
+      puts "#{label} (would remove)"
+    end
+    total += 1
+  end
+end
+
+puts
+puts FORCE ? "removed #{total}" : "#{total} to remove; run with --force"

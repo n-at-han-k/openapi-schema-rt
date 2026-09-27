@@ -19,6 +19,16 @@
     };
     version = "1.6.2";
   };
+  dotenv = {
+    groups = ["default"];
+    platforms = [];
+    source = {
+      remotes = ["https://rubygems.org"];
+      sha256 = "17b1zr9kih0i3wb7h4yq9i8vi6hjfq07857j437a8z7a44qvhxg3";
+      type = "gem";
+    };
+    version = "3.2.0";
+  };
   hana = {
     groups = ["default"];
     platforms = [];

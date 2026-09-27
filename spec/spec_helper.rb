@@ -5,10 +5,14 @@
 # schema in request_tracker_rest2.yaml is the assertion and no expectation is
 # ever written twice.
 #
-# Point it at a real RT:
+# Point it at a real RT with a .env beside this repository's root:
 #
-#   RT_TOKEN=1-14-... bundle exec rspec
-#   RT_URL=https://rt.example.com RT_TOKEN=... bundle exec rspec
+#   RT_URL=https://rt.example.com
+#   RT_TOKEN=1-14-...
+#   RT_MUTATE=1            # optional, see below
+#
+# .env is gitignored; .env.example is the template. The environment still
+# wins, so a one-off run can override any of it.
 #
 # READ-ONLY by default. An operation that changes something -- a PUT, a
 # DELETE, or a POST the document says answers 201 -- is skipped unless
@@ -20,7 +24,14 @@ require 'net/http'
 require 'uri'
 require 'yaml'
 
+require 'dotenv'
 require 'json_schemer'
+
+# Loaded before anything reads ENV below. `overload: false` is the default
+# and the point: a variable already exported wins over the file.
+Dotenv.load(File.expand_path('../.env', __dir__))
+
+require_relative 'scratch'
 
 module RT
   ROOT = File.expand_path('..', __dir__)
@@ -53,9 +64,11 @@ module RT
     end
 
     fixture = FIXTURES.fetch('paths', {}).fetch(path, {}) || {}
+    changing = mutating?(method, operation)
 
     begin
-      target = fill(path, fixture)
+      target = changing ? fill_scratch(path, method) : fill(path, fixture)
+      fixture = fixture.merge('body' => body_for(path, method)) if changing && needs_body?(operation)
     rescue MissingFixture => e
       return example.skip(e.message)
     end
@@ -67,6 +80,8 @@ module RT
       raise "#{method} #{path} answered #{response.status}, which the document does not " \
             "describe (it describes #{declared.join(', ')}). Body: #{response.raw[0, 300]}"
     end
+
+    Scratch.forget(subject_of(path)) if changing && method == 'DELETE' && response.status.start_with?('2')
 
     schema = operation.dig('responses', response.status, 'content', 'application/json', 'schema')
     # A response the document describes without a body, or by $ref to a shared
@@ -93,6 +108,68 @@ module RT
 
   MissingFixture = Class.new(StandardError)
 
+  # Which kind of object a path is about, from its first literal segment.
+  # /queue/{idOrName}/rights/... is about a queue.
+  def subject_of(path)
+    segment = path.split('/').reject(&:empty?).first.to_s
+
+    Scratch::RECIPES.key?(segment) ? segment : segment.sub(/s\z/, '')
+  end
+
+  # A mutating operation is aimed at something this run made. Nothing here
+  # ever touches an object that was in RT before the suite started.
+  def fill_scratch(path, method)
+    subject = subject_of(path)
+
+    path.gsub(/\{(\w+)\}/) do
+      case Regexp.last_match(1)
+      when 'valueId'     then Scratch.fetch_value
+      when 'principalId' then Scratch.fetch('group')
+      when 'groupId'     then Scratch.fetch('group')
+      when 'right'       then 'SeeQueue'
+      else
+        unless Scratch::RECIPES.key?(subject)
+          raise(MissingFixture, "nothing safe to aim #{method} #{path} at: no scratch #{subject}")
+        end
+
+        Scratch.fetch(subject)
+      end
+    end
+  end
+
+  def needs_body?(operation)
+    operation.key?('requestBody')
+  end
+
+  # The smallest body the document says is acceptable, built from the schema's
+  # own required fields and examples rather than from a table of guesses.
+  def body_for(path, method)
+    fixture = FIXTURES.fetch('bodies', {})["#{method} #{path}"]
+    raise(MissingFixture, "no body fixture for #{method} #{path}") if fixture.nil?
+
+    resolve(fixture)
+  end
+
+  # %{queue} and friends are whatever spec/scratch.rb made for this run. A
+  # body cannot name a real object even by mistake, because nothing but these
+  # placeholders is substituted.
+  def resolve(node)
+    case node
+    when Hash  then node.transform_values { |value| resolve(value) }
+    when Array then node.map { |value| resolve(value) }
+    when String
+      node.gsub(/%\{(\w+)\}/) do
+        key = Regexp.last_match(1)
+        case key
+        when 'run'    then Scratch::RUN
+        when 'serial' then Scratch.serial
+        else Scratch.fetch(key)
+        end
+      end
+    else node
+    end
+  end
+
   # Path parameters come from spec/fixtures.yml: this suite talks to a real
   # RT, and only the person running it knows which ticket is safe to read.
   def fill(path, fixture)
@@ -107,7 +184,7 @@ module RT
     end
   end
 
-  def call(method, target, fixture)
+  def call(method, target, fixture = {})
     uri = URI.parse(BASE.to_s + target)
     uri.query = fixture['query'] if fixture['query']
 
@@ -149,5 +226,15 @@ end
 
 RSpec.configure do |config|
   config.disable_monkey_patching!
+
+  # Whatever the mutating half made, taken back down -- even if it failed,
+  # and including what the CREATE examples made, which Scratch never saw. By
+  # name rather than by a list of ids, because a run that dies halfway leaves
+  # no list.
+  config.after(:suite) do
+    if ENV['RT_MUTATE'] == '1'
+      system(File.expand_path('../bin/scrub-scratch', __dir__), '--force', out: File::NULL)
+    end
+  end
   config.formatter = :documentation if ENV['RT_TOKEN']
 end

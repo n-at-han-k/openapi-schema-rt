@@ -6,7 +6,7 @@ openapi: "3.1.0"
 info:
   title: Request Tracker REST2
   description: Partial specification of Request Tracker's REST2 API.
-  version: "0.3.2"
+  version: "0.3.3"
   contact:
     name: Iisakki Jaakkola
     email: iihaja@utu.fi
@@ -1059,6 +1059,25 @@ components:
           type: object
           additionalProperties:
             type: string
+    lifecycleDocument:
+      description: A lifecycle as RT hands it back -- its whole configuration,
+        plus the name it is addressed by. A lifecycle has no id at all, and
+        the `type` here is the kind of object it governs rather than the kind
+        of thing it is.
+      allOf:
+        - $ref: '#/components/schemas/lifecycleConfiguration'
+        - type: object
+          properties:
+            name:
+              type: string
+            canonical_case:
+              description: The capitalisation RT treats as canonical for each
+                status, keyed by the lower-case form.
+              type: object
+              additionalProperties:
+                type: string
+            _url:
+              $ref: '#/components/schemas/url'
     lifecycleMaps:
       description: How statuses translate when an object moves between two
         lifecycles. Keyed "<from> -> <to>".
@@ -3052,8 +3071,12 @@ paths:
                       Class:
                         $ref: '#/components/schemas/classReference'
                       Parent:
-                        type: integer
-                        minimum: 0
+                        # Quoted: `GET /article/1` answers "Parent":"0" even
+                        # though it is plainly a number. RT does this with
+                        # most of its integers.
+                        anyOf:
+                          - type: integer
+                          - type: string
                       URI:
                         type: string
                       Disabled:
@@ -3185,14 +3208,7 @@ paths:
                 # one of them with its whole configuration inline.
                 type: array
                 items:
-                  allOf:
-                    - $ref: '#/components/schemas/lifecycleConfiguration'
-                    - type: object
-                      properties:
-                        Name:
-                          type: string
-                        _url:
-                          $ref: '#/components/schemas/url'
+                  $ref: '#/components/schemas/lifecycleDocument'
         "401":
           $ref: '#/components/responses/401'
         default:
@@ -3217,6 +3233,10 @@ paths:
               properties:
                 Name:
                   type: string
+                  # RT answers 400 "Lifecycle Name has a maximum length of 32
+                  # characters" -- the only length limit in this API that is
+                  # enforced rather than documented.
+                  maxLength: 32
                   example: support
                 Type:
                   type: string
@@ -3232,7 +3252,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/lifecycleReference'
+                $ref: '#/components/schemas/lifecycleDocument'
           links:
             get:
               description: Get the lifecycle you just created.
@@ -3259,7 +3279,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/lifecycleConfiguration'
+                $ref: '#/components/schemas/lifecycleDocument'
         "401":
           $ref: '#/components/responses/401'
         "404":
@@ -3284,9 +3304,9 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                # The lifecycle as it now stands, not a list of what changed.
+                # Unlike every other PUT in this API.
+                $ref: '#/components/schemas/lifecycleDocument'
         "400":
           $ref: '#/components/responses/400'
         "404":
@@ -3347,9 +3367,8 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                # The maps as they now stand -- `{}` when there are none.
+                $ref: '#/components/schemas/lifecycleMaps'
         "400":
           $ref: '#/components/responses/400'
         "404":
@@ -3561,11 +3580,17 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
-                example:
-                  - "Granted right 'CreateTicket' to Staff"
+                # The grant itself, not a list of messages: RT answers
+                # {"Right":"SeeQueue","Group":{"id":257,...}}.
+                allOf:
+                  - type: object
+                    properties:
+                      Right:
+                        type: string
+                      Group:
+                        $ref: '#/components/schemas/principalReference'
+                      User:
+                        $ref: '#/components/schemas/principalReference'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -3736,11 +3761,17 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
-                example:
-                  - "Granted right 'CreateTicket' to Staff"
+                # The grant itself, not a list of messages: RT answers
+                # {"Right":"SeeQueue","Group":{"id":257,...}}.
+                allOf:
+                  - type: object
+                    properties:
+                      Right:
+                        type: string
+                      Group:
+                        $ref: '#/components/schemas/principalReference'
+                      User:
+                        $ref: '#/components/schemas/principalReference'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -3911,11 +3942,17 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
-                example:
-                  - "Granted right 'CreateTicket' to Staff"
+                # The grant itself, not a list of messages: RT answers
+                # {"Right":"SeeQueue","Group":{"id":257,...}}.
+                allOf:
+                  - type: object
+                    properties:
+                      Right:
+                        type: string
+                      Group:
+                        $ref: '#/components/schemas/principalReference'
+                      User:
+                        $ref: '#/components/schemas/principalReference'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4086,11 +4123,17 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
-                example:
-                  - "Granted right 'CreateTicket' to Staff"
+                # The grant itself, not a list of messages: RT answers
+                # {"Right":"SeeQueue","Group":{"id":257,...}}.
+                allOf:
+                  - type: object
+                    properties:
+                      Right:
+                        type: string
+                      Group:
+                        $ref: '#/components/schemas/principalReference'
+                      User:
+                        $ref: '#/components/schemas/principalReference'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4261,11 +4304,17 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
-                example:
-                  - "Granted right 'CreateTicket' to Staff"
+                # The grant itself, not a list of messages: RT answers
+                # {"Right":"SeeQueue","Group":{"id":257,...}}.
+                allOf:
+                  - type: object
+                    properties:
+                      Right:
+                        type: string
+                      Group:
+                        $ref: '#/components/schemas/principalReference'
+                      User:
+                        $ref: '#/components/schemas/principalReference'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4434,11 +4483,17 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
-                example:
-                  - "Granted right 'CreateTicket' to Staff"
+                # The grant itself, not a list of messages: RT answers
+                # {"Right":"SeeQueue","Group":{"id":257,...}}.
+                allOf:
+                  - type: object
+                    properties:
+                      Right:
+                        type: string
+                      Group:
+                        $ref: '#/components/schemas/principalReference'
+                      User:
+                        $ref: '#/components/schemas/principalReference'
         "400":
           $ref: '#/components/responses/400'
         "401":

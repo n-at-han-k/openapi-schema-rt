@@ -33,3 +33,68 @@ paths:
     params: { id: 2 }
   /customfield/{id}/value/{valueId}:
     params: { id: 2 }
+
+# Bodies for the mutating examples, by "METHOD /path". Only what the document
+# marks required, plus what RT refuses a create without -- the point is to
+# exercise the endpoint, not to model a realistic object.
+#
+# The TARGETS are never listed here. A mutating example is aimed at an object
+# spec/scratch.rb made for this run, so no fixture can accidentally point a
+# DELETE at queue General or user root. %{...} is filled from those same
+# scratch objects.
+bodies:
+  "POST /ticket": { Queue: "%{queue}", Subject: "conformance suite" }
+  "PUT /ticket/{id}": { Subject: "conformance suite, updated" }
+
+  "POST /queue": { Name: "conf-x-queue-%{run}-%{serial}" }
+  "PUT /queue/{idOrName}": { Description: "conformance suite" }
+
+  "POST /user": { Name: "conf-x-user-%{run}-%{serial}", Password: "conformance-suite-password" }
+  "PUT /user/{idOrName}": { RealName: "Conformance Suite" }
+
+  "POST /group": { Name: "conf-x-group-%{run}-%{serial}" }
+  "PUT /group/{id}": { Description: "conformance suite" }
+  "PUT /group/{id}/members": ["%{group}"]
+  "PUT /user/{idOrName}/groups": ["%{group}"]
+
+  "POST /customfield": { Name: "conf-x-cf-%{run}-%{serial}", Type: Freeform, MaxValues: "1", LookupType: "RT::Queue-RT::Ticket" }
+  "PUT /customfield/{id}": { Description: "conformance suite" }
+  "POST /customfield/{id}/value": { Name: "conformance-value-%{run}-%{serial}" }
+  "PUT /customfield/{id}/value/{valueId}": { Description: "conformance suite" }
+
+  "POST /catalog": { Name: "conf-x-catalog-%{run}-%{serial}" }
+  "PUT /catalog/{idOrName}": { Description: "conformance suite" }
+
+  "POST /class": { Name: "conf-x-class-%{run}-%{serial}" }
+  "PUT /class/{idOrName}": { Description: "conformance suite" }
+
+  "POST /asset": { Name: "conf-x-asset-%{run}-%{serial}", Catalog: "%{catalog}" }
+  "PUT /asset/{id}": { Description: "conformance suite" }
+
+  "POST /article": { Name: "conf-x-article-%{run}-%{serial}", Class: "%{class}" }
+  "PUT /article/{id}": { Summary: "conformance suite" }
+
+  "POST /lifecycles": { Name: "conf-lc-extra-%{serial}", Type: ticket }
+  "PUT /lifecycle/{name}":
+    type: ticket
+    initial: [new]
+    active: [open]
+    inactive: [resolved]
+    defaults: { on_create: new }
+    transitions: { "": [new], new: [open], open: [resolved], resolved: [] }
+  "PUT /lifecycle/{name}/maps": {}
+  "POST /lifecycle/{name}/validate": { type: ticket, initial: [new], active: [open], inactive: [resolved] }
+
+  # Rights are granted to a scratch GROUP, so nothing real gains or loses one.
+  "POST /queue/{idOrName}/rights": { Right: SeeQueue, Group: "%{group}" }
+  "POST /group/{id}/rights": { Right: SeeGroup, Group: "%{group}" }
+  "POST /class/{idOrName}/rights": { Right: ShowArticle, Group: "%{group}" }
+  "POST /catalog/{idOrName}/rights": { Right: ShowCatalog, Group: "%{group}" }
+  "POST /customfield/{id}/rights": { Right: SeeCustomField, Group: "%{group}" }
+  "POST /global/rights": { Right: ShowConfigTab, Group: "%{group}" }
+  "POST /queue/{idOrName}/rights/bulk": { grant: [{ Right: SeeQueue, Group: "%{group}" }] }
+  "POST /group/{id}/rights/bulk": { grant: [{ Right: SeeGroup, Group: "%{group}" }] }
+  "POST /class/{idOrName}/rights/bulk": { grant: [{ Right: ShowArticle, Group: "%{group}" }] }
+  "POST /catalog/{idOrName}/rights/bulk": { grant: [{ Right: ShowCatalog, Group: "%{group}" }] }
+  "POST /customfield/{id}/rights/bulk": { grant: [{ Right: SeeCustomField, Group: "%{group}" }] }
+  "POST /global/rights/bulk": { grant: [{ Right: ShowConfigTab, Group: "%{group}" }] }
