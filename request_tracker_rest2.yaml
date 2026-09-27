@@ -6,7 +6,7 @@ openapi: "3.1.0"
 info:
   title: Request Tracker REST2
   description: Partial specification of Request Tracker's REST2 API.
-  version: "0.3.0"
+  version: "0.3.1"
   contact:
     name: Iisakki Jaakkola
     email: iihaja@utu.fi
@@ -521,6 +521,8 @@ components:
           customfield: '#/components/schemas/hyperlinkCustomField'
           customfieldvalues: '#/components/schemas/hyperlinkCustomFieldValues'
           history: '#/components/schemas/hyperlinkHistory'
+          rights: '#/components/schemas/hyperlinkRights'
+          rights-available: '#/components/schemas/hyperlinkRights'
           lifecycle: '#/components/schemas/hyperlinkLifecycle'
           members: '#/components/schemas/hyperlinkMembers'
           memberships: '#/components/schemas/hyperlinkMemberships'
@@ -569,6 +571,11 @@ components:
             - name
     hyperlinkCustomFieldValues:
       description: Reference to available customfield values of select type CFs.
+      allOf:
+        - $ref: '#/components/schemas/hyperlink'
+    hyperlinkRights:
+      description: Link to an object's rights, or to the rights that can be
+        granted on it. Carries no id of its own.
       allOf:
         - $ref: '#/components/schemas/hyperlink'
     hyperlinkHistory:
@@ -622,8 +629,14 @@ components:
         - type: object
           properties:
             id:
-              type: string
-              example: "3"
+              # A NUMBER here, whatever it is elsewhere: `GET /queue/3` answers
+              # `"_hyperlinks":[{"id":3,...}]` unquoted, while the same object's
+              # `TicketCustomFields[].id` is the string "2". Declared as only a
+              # string, a strict client cannot parse a queue it just created.
+              anyOf:
+                - type: integer
+                - type: string
+              example: 3
             type:
               $ref: '#/components/schemas/typeEnum'
           required:
