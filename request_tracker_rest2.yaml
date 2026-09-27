@@ -6,7 +6,7 @@ openapi: "3.1.0"
 info:
   title: Request Tracker REST2
   description: Partial specification of Request Tracker's REST2 API.
-  version: "0.2.1"
+  version: "0.3.0"
   contact:
     name: Iisakki Jaakkola
     email: iihaja@utu.fi
@@ -27,6 +27,13 @@ tags:
   - name: Group
   - name: Group Memberships
   - name: Custom Field
+  - name: Custom Role
+  - name: Catalog
+  - name: Class
+  - name: Asset
+  - name: Article
+  - name: Lifecycle
+  - name: Rights
 components:
   securitySchemes:
     token:
@@ -749,6 +756,318 @@ components:
       type: string
       enum:
         - ticket
+    # Reverse engineered from the endpoints documented at
+    # https://docs.bestpractical.com/rt/latest/RT/REST2.html and the Create()
+    # arguments each class documents. Added for the objects the spec did not
+    # cover: catalogs, classes, assets, articles, custom roles, custom field
+    # values, lifecycles and rights.
+    catalogReference:
+      description: A reference to a catalog.
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/typelessGenericObject'
+        - type: object
+          description: Always a catalog
+          properties:
+            type:
+              type: string
+              enum:
+                - catalog
+          required:
+            - type
+    classReference:
+      description: A reference to a class.
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/typelessGenericObject'
+        - type: object
+          description: Always a class
+          properties:
+            type:
+              type: string
+              enum:
+                - class
+          required:
+            - type
+    assetReference:
+      description: A reference to an asset.
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/typelessGenericObject'
+        - type: object
+          description: Always an asset
+          properties:
+            type:
+              type: string
+              enum:
+                - asset
+          required:
+            - type
+    articleReference:
+      description: A reference to an article.
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/typelessGenericObject'
+        - type: object
+          description: Always an article
+          properties:
+            type:
+              type: string
+              enum:
+                - article
+          required:
+            - type
+    lifecycleReference:
+      description: A reference to a lifecycle. Lifecycles are addressed by name.
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/typelessGenericObject'
+        - type: object
+          description: Always a lifecycle
+          properties:
+            type:
+              type: string
+              enum:
+                - lifecycle
+          required:
+            - type
+    catalogPropertiesCommon:
+      description: Properties of a catalog, which is to assets what a queue is to tickets.
+      type: object
+      properties:
+        Name:
+          type: string
+          maxLength: 255
+        Description:
+          type: string
+          maxLength: 255
+        Lifecycle:
+          type: string
+          description: Name of the lifecycle governing this catalog's assets.
+          example: assets
+        Disabled:
+          $ref: '#/components/schemas/perlBoolean'
+    classPropertiesCommon:
+      description: Properties of an article class.
+      type: object
+      properties:
+        Name:
+          type: string
+          maxLength: 255
+        Description:
+          type: string
+          maxLength: 255
+        SortOrder:
+          $ref: '#/components/schemas/sortOrder'
+        Disabled:
+          $ref: '#/components/schemas/perlBoolean'
+    assetPropertiesCommon:
+      description: Properties of an asset. The role fields take principal ids.
+      type: object
+      properties:
+        Name:
+          type: string
+          maxLength: 255
+        Description:
+          type: string
+          maxLength: 255
+        Catalog:
+          type: string
+          description: Name or numeric id of the catalog the asset belongs to.
+          example: General assets
+        Status:
+          type: string
+          description: A status from the catalog's lifecycle.
+          example: in-use
+        Owner:
+          type: string
+          description: Principal id or name of the owner.
+        HeldBy:
+          type: array
+          description: Principal ids or names holding the asset.
+          items:
+            type: string
+        Contact:
+          type: array
+          description: Principal ids or names to contact about the asset.
+          items:
+            type: string
+    articlePropertiesCommon:
+      description: Properties of an article.
+      type: object
+      properties:
+        Name:
+          type: string
+          maxLength: 255
+        Summary:
+          type: string
+          maxLength: 255
+        Class:
+          type: string
+          description: Name or numeric id of the class the article belongs to.
+        SortOrder:
+          $ref: '#/components/schemas/sortOrder'
+        Parent:
+          type: integer
+          description: Id of the parent article, if any.
+          minimum: 0
+        URI:
+          type: string
+          maxLength: 255
+        Disabled:
+          $ref: '#/components/schemas/perlBoolean'
+    customRolePropertiesCommon:
+      description: Properties of a custom role, which is a ticket role beyond
+        Owner, Requestor, Cc and AdminCc.
+      type: object
+      properties:
+        Name:
+          type: string
+          maxLength: 200
+        Description:
+          type: string
+          maxLength: 255
+        MaxValues:
+          type: string
+          description: Whether the role takes a single principal.
+          enum:
+            # single valued
+            - "1"
+            # multiple valued
+            - "0"
+        EntryHint:
+          type: string
+          maxLength: 255
+        LookupType:
+          type: string
+          description: What type of object this role applies to.
+          example: RT::Queue-RT::Ticket
+        Disabled:
+          $ref: '#/components/schemas/perlBoolean'
+    customFieldValuePropertiesCommon:
+      description: One of the values a Select or Combobox custom field offers.
+      type: object
+      properties:
+        Name:
+          type: string
+        Description:
+          type: string
+        SortOrder:
+          $ref: '#/components/schemas/sortOrder'
+        Category:
+          type: string
+          description: Groups values under a heading, for a field based on another.
+    lifecycleConfiguration:
+      description: A lifecycle's whole configuration. RT spells these keys in
+        lower case, unlike every other object in this API.
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - ticket
+            - asset
+        initial:
+          description: Statuses a new object may start in.
+          type: array
+          items:
+            type: string
+        active:
+          description: Statuses meaning work is ongoing.
+          type: array
+          items:
+            type: string
+        inactive:
+          description: Statuses meaning work has stopped.
+          type: array
+          items:
+            type: string
+        defaults:
+          description: Which status an action moves an object to.
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            on_create: new
+            on_resolve: resolved
+        transitions:
+          description: Which statuses each status may move to. The empty key is
+            the transition into the lifecycle.
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        rights:
+          description: The right required to make a transition.
+          type: object
+          additionalProperties:
+            type: string
+        actions:
+          description: The transitions offered in the UI.
+          type: array
+          items:
+            type: object
+        colors:
+          description: A colour per status, as shown in the UI.
+          type: object
+          additionalProperties:
+            type: string
+    lifecycleMaps:
+      description: How statuses translate when an object moves between two
+        lifecycles. Keyed "<from> -> <to>".
+      type: object
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: string
+    rightGrant:
+      description: One right, granted to one principal. Exactly one of Group and
+        User is given.
+      type: object
+      properties:
+        Right:
+          type: string
+          example: CreateTicket
+        Group:
+          type: string
+          description: Name or id of the group receiving the right.
+          example: Staff
+        User:
+          type: string
+          description: Name or id of the user receiving the right.
+      required:
+        - Right
+    rightsBulk:
+      description: Rights to grant and to revoke in one request.
+      type: object
+      properties:
+        grant:
+          type: array
+          items:
+            $ref: '#/components/schemas/rightGrant'
+        revoke:
+          type: array
+          items:
+            $ref: '#/components/schemas/rightGrant'
+    rightsList:
+      description: The rights granted on an object, one entry per principal.
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/paginated'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  Right:
+                    type: string
+                  Group:
+                    $ref: '#/components/schemas/groupReference'
+                  User:
+                    $ref: '#/components/schemas/userReference'
   parameters:
     id:
       name: id
@@ -770,6 +1089,14 @@ components:
             description: Id of the resource
           - type: string
             description: Name of the resource
+    name:
+      name: name
+      in: path
+      required: true
+      description: Name of the resource. Lifecycles are addressed by name, not by id.
+      schema:
+        type: string
+        example: support
     query:
       name: query
       in: query
@@ -1144,6 +1471,22 @@ paths:
           $ref: '#/components/responses/401'
         default:
           description: Unexpected error.
+    delete:
+      description: Remove a user from every group they are a member of.
+      operationId: user_name_groups_delete
+      tags:
+        - User Memberships
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/doubleDeletion'
+        default:
+          description: Unexpected error.
   /groups:
     parameters:
       - $ref: '#/components/parameters/query'
@@ -1281,6 +1624,57 @@ paths:
           $ref: '#/components/responses/404'
         default:
           description: Unexpected error.
+    put:
+      description: Update a group.
+      operationId: group_id_put
+      tags:
+        - Group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                Name:
+                  type: string
+                Description:
+                  type: string
+                Disabled:
+                  $ref: '#/components/schemas/perlBoolean'
+      responses:
+        "200":
+          description: This is returned pretty much always. You need to inspect
+            the content to figure out what happened.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    delete:
+      description: Disable a group. Doesn't actually delete anything.
+      operationId: group_id_delete
+      tags:
+        - Group
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/doubleDeletion'
+        default:
+          description: Unexpected error.
   /group/{id}/members:
     parameters:
       - $ref: '#/components/parameters/id'
@@ -1337,6 +1731,22 @@ paths:
                     - "Groups can't be members of their members"
         "401":
           $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+    delete:
+      description: Remove every member from a group.
+      operationId: group_id_members_delete
+      tags:
+        - Group Memberships
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/doubleDeletion'
         default:
           description: Unexpected error.
   /queues/all:
@@ -1538,6 +1948,55 @@ paths:
           # This is thrown if you try to delete an already deleted queue.
           # I reported this. Let's see if they fix it.
           $ref: '#/components/responses/doubleDeletion'
+        default:
+          description: Unexpected error.
+    put:
+      description: Update a queue.
+      operationId: queue_id_name_put
+      tags:
+        - Queue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: These are the properties shown in the UI. Others could be accepted here as well.
+              additionalProperties: false
+              properties:
+                Name:
+                  type: string
+                Description:
+                  type: string
+                Lifecycle:
+                  type: string
+                SubjectTag:
+                  type: string
+                SortOrder:
+                  $ref: '#/components/schemas/sortOrder'
+                CorrespondAddress:
+                  type: string
+                  description: Reply Address in the UI
+                CommentAddress:
+                  type: string
+                SLADisabled:
+                  $ref: '#/components/schemas/perlBoolean'
+                Disabled:
+                  $ref: '#/components/schemas/perlBoolean'
+      responses:
+        "200":
+          description: This is returned pretty much always. You need to inspect
+            the content to figure out what happened.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
         default:
           description: Unexpected error.
   /tickets:
@@ -1785,6 +2244,22 @@ paths:
           $ref: '#/components/responses/404'
         default:
           description: Unexpected error.
+    delete:
+      description: Delete a ticket, which sets its status to deleted rather than removing anything. What RT calls a shredder is not in this API.
+      operationId: ticket_id_delete
+      tags:
+        - Ticket
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/doubleDeletion'
+        default:
+          description: Unexpected error.
   /customfields:
     post:
       description: Search for custom fields.
@@ -1886,6 +2361,69 @@ paths:
           $ref: '#/components/responses/404'
         default:
           description: Unexpected error.
+    put:
+      description: Update a customfield.
+      operationId: customfield_id_put
+      tags:
+        - Custom Field
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/customFieldCommon'
+                - type: object
+                  properties:
+                    Description:
+                      type: string
+                    EntryHint:
+                      type: string
+                    MaxValues:
+                      type: string
+                      enum:
+                        - "1"
+                        - "0"
+                    UniqueValues:
+                      $ref: '#/components/schemas/perlBoolean'
+                    Pattern:
+                      type: string
+                    SortOrder:
+                      $ref: '#/components/schemas/sortOrder'
+                    Disabled:
+                      $ref: '#/components/schemas/perlBoolean'
+      responses:
+        "200":
+          description: This is returned pretty much always. You need to inspect
+            the content to figure out what happened.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    delete:
+      description: Disable a customfield. Doesn't actually delete anything.
+      operationId: customfield_id_delete
+      tags:
+        - Custom Field
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/doubleDeletion'
+        default:
+          description: Unexpected error.
   /customfield:
     post:
       description: Create a customfield.
@@ -1945,5 +2483,2060 @@ paths:
           $ref: '#/components/responses/400'
         "401":
           $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /catalogs/all:
+    get:
+      description: Retrieve a list of all catalogs you can see.
+      operationId: catalogs_all_get
+      tags:
+        - Catalog
+      responses:
+        "200":
+          description: Catalogs queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/catalogReference'
+                    required:
+                      - items
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /catalog:
+    post:
+      description: Create a new catalog. A catalog is to assets what a queue is
+        to tickets.
+      operationId: catalog_post
+      tags:
+        - Catalog
+      requestBody:
+        description: Specifications for the new catalog.
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/catalogPropertiesCommon'
+                - type: object
+                  required:
+                    - Name
+            example:
+              Name: Laptops
+              Lifecycle: assets
+      responses:
+        "201":
+          description: Catalog created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/catalogReference'
+          links:
+            get:
+              description: Get the catalog you just created.
+              operationId: catalog_id_name_get
+              parameters:
+                idOrName: $response.body#/id
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /catalog/{idOrName}:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    get:
+      description: Get information about a catalog.
+      operationId: catalog_id_name_get
+      tags:
+        - Catalog
+      responses:
+        "200":
+          description: Catalog queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/objectMetadata'
+                  - $ref: '#/components/schemas/customFields'
+                  - $ref: '#/components/schemas/catalogPropertiesCommon'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    put:
+      description: Update a catalog.
+      operationId: catalog_id_name_put
+      tags:
+        - Catalog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/catalogPropertiesCommon'
+      responses:
+        "200":
+          description: This is returned pretty much always. You need to inspect
+            the content to figure out what happened.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  - "Catalog Description changed from 'old' to 'new'"
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    delete:
+      description: Disable a catalog. Doesn't actually delete anything.
+      operationId: catalog_id_name_delete
+      tags:
+        - Catalog
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/doubleDeletion'
+        default:
+          description: Unexpected error.
+  /classes/all:
+    get:
+      description: Retrieve a list of all article classes you can see.
+      operationId: classes_all_get
+      tags:
+        - Class
+      responses:
+        "200":
+          description: Classes queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/classReference'
+                    required:
+                      - items
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /class:
+    post:
+      description: Create a new article class.
+      operationId: class_post
+      tags:
+        - Class
+      requestBody:
+        description: Specifications for the new class.
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/classPropertiesCommon'
+                - type: object
+                  required:
+                    - Name
+            example:
+              Name: Runbooks
+      responses:
+        "201":
+          description: Class created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/classReference'
+          links:
+            get:
+              description: Get the class you just created.
+              operationId: class_id_name_get
+              parameters:
+                idOrName: $response.body#/id
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /class/{idOrName}:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    get:
+      description: Get information about an article class.
+      operationId: class_id_name_get
+      tags:
+        - Class
+      responses:
+        "200":
+          description: Class queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/objectMetadata'
+                  - $ref: '#/components/schemas/classPropertiesCommon'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    put:
+      description: Update an article class.
+      operationId: class_id_name_put
+      tags:
+        - Class
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/classPropertiesCommon'
+      responses:
+        "200":
+          description: This is returned pretty much always. You need to inspect
+            the content to figure out what happened.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    delete:
+      description: Disable an article class. Doesn't actually delete anything.
+      operationId: class_id_name_delete
+      tags:
+        - Class
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/doubleDeletion'
+        default:
+          description: Unexpected error.
+  /assets:
+    get:
+      description: Search assets with AssetSQL.
+      operationId: assets_get
+      tags:
+        - Asset
+      parameters:
+        - $ref: '#/components/parameters/query'
+      responses:
+        "200":
+          description: Assets queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/assetReference'
+                    required:
+                      - items
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /asset:
+    post:
+      description: Create a new asset.
+      operationId: asset_post
+      tags:
+        - Asset
+      requestBody:
+        description: Specifications for the new asset.
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/customFieldsUpload'
+                - $ref: '#/components/schemas/assetPropertiesCommon'
+                - type: object
+                  required:
+                    - Catalog
+            example:
+              Name: nathans-laptop
+              Catalog: Laptops
+              Status: in-use
+      responses:
+        "201":
+          description: Asset created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/assetReference'
+          links:
+            get:
+              description: Get the asset you just created.
+              operationId: asset_id_get
+              parameters:
+                id: $response.body#/id
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /asset/{id}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: Get information about an asset.
+      operationId: asset_id_get
+      tags:
+        - Asset
+      responses:
+        "200":
+          description: Asset queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/objectMetadata'
+                  - $ref: '#/components/schemas/customFields'
+                  - type: object
+                    properties:
+                      Name:
+                        type: string
+                      Description:
+                        type: string
+                      Catalog:
+                        $ref: '#/components/schemas/catalogReference'
+                      Status:
+                        type: string
+                      Owner:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/userReference'
+                      HeldBy:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/userReference'
+                      Contact:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/userReference'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    put:
+      description: Update an asset.
+      operationId: asset_id_put
+      tags:
+        - Asset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/customFieldsUpload'
+                - $ref: '#/components/schemas/assetPropertiesCommon'
+      responses:
+        "200":
+          description: This is returned pretty much always. You need to inspect
+            the content to figure out what happened.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    delete:
+      description: Delete an asset, which sets its status to deleted.
+      operationId: asset_id_delete
+      tags:
+        - Asset
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/doubleDeletion'
+        default:
+          description: Unexpected error.
+  /articles:
+    post:
+      description: Search articles with a JSON search.
+      operationId: articles_get
+      tags:
+        - Article
+      requestBody:
+        $ref: '#/components/requestBodies/jsonSearch'
+      responses:
+        "200":
+          description: Articles queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/articleReference'
+                    required:
+                      - items
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /article:
+    post:
+      description: Create a new article.
+      operationId: article_post
+      tags:
+        - Article
+      requestBody:
+        description: Specifications for the new article.
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/customFieldsUpload'
+                - $ref: '#/components/schemas/articlePropertiesCommon'
+                - type: object
+                  required:
+                    - Class
+            example:
+              Name: How to restart the widget service
+              Class: Runbooks
+      responses:
+        "201":
+          description: Article created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/articleReference'
+          links:
+            get:
+              description: Get the article you just created.
+              operationId: article_id_get
+              parameters:
+                id: $response.body#/id
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /article/{id}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: Get information about an article.
+      operationId: article_id_get
+      tags:
+        - Article
+      responses:
+        "200":
+          description: Article queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/objectMetadata'
+                  - $ref: '#/components/schemas/customFields'
+                  - type: object
+                    properties:
+                      Name:
+                        type: string
+                      Summary:
+                        type: string
+                      SortOrder:
+                        $ref: '#/components/schemas/sortOrder'
+                      Class:
+                        $ref: '#/components/schemas/classReference'
+                      Parent:
+                        type: integer
+                        minimum: 0
+                      URI:
+                        type: string
+                      Disabled:
+                        $ref: '#/components/schemas/perlBoolean'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    put:
+      description: Update an article.
+      operationId: article_id_put
+      tags:
+        - Article
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/customFieldsUpload'
+                - $ref: '#/components/schemas/articlePropertiesCommon'
+      responses:
+        "200":
+          description: This is returned pretty much always. You need to inspect
+            the content to figure out what happened.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    delete:
+      description: Disable an article. Doesn't actually delete anything.
+      operationId: article_id_delete
+      tags:
+        - Article
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/doubleDeletion'
+        default:
+          description: Unexpected error.
+  /customroles:
+    post:
+      description: Search custom roles with a JSON search.
+      operationId: customroles_get
+      tags:
+        - Custom Role
+      requestBody:
+        $ref: '#/components/requestBodies/jsonSearch'
+      responses:
+        "200":
+          description: Custom roles queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/genericObject'
+                    required:
+                      - items
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /customrole/{id}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: Get information about a custom role. RT offers no way to
+        create or modify one through this API; the web UI is the only way.
+      operationId: customrole_id_get
+      tags:
+        - Custom Role
+      responses:
+        "200":
+          description: Custom role queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/objectMetadata'
+                  - $ref: '#/components/schemas/customRolePropertiesCommon'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /lifecycles:
+    get:
+      description: Retrieve a list of the lifecycles configured on this RT.
+      operationId: lifecycles_get
+      tags:
+        - Lifecycle
+      parameters:
+        - name: type
+          in: query
+          description: Limit the list to lifecycles of one kind.
+          schema:
+            type: string
+            enum:
+              - ticket
+              - asset
+      responses:
+        "200":
+          description: Lifecycles queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/lifecycleReference'
+                    required:
+                      - items
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+    post:
+      description: Create a new lifecycle. Note that unlike every other object
+        in this API, a lifecycle is created on its PLURAL path -- there is no
+        POST /lifecycle -- and is addressed by name thereafter.
+      operationId: lifecycles_post
+      tags:
+        - Lifecycle
+      requestBody:
+        description: The new lifecycle. Only the name and the type are given
+          here; the statuses and transitions are configured with a subsequent
+          PUT, which is how the web UI does it too.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                Name:
+                  type: string
+                  example: support
+                Type:
+                  type: string
+                  enum:
+                    - ticket
+                    - asset
+              required:
+                - Name
+                - Type
+      responses:
+        "201":
+          description: Lifecycle created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/lifecycleReference'
+          links:
+            get:
+              description: Get the lifecycle you just created.
+              operationId: lifecycle_name_get
+              parameters:
+                name: $response.body#/id
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /lifecycle/{name}:
+    parameters:
+      - $ref: '#/components/parameters/name'
+    get:
+      description: Get a lifecycle's configuration.
+      operationId: lifecycle_name_get
+      tags:
+        - Lifecycle
+      responses:
+        "200":
+          description: Lifecycle queried successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/lifecycleConfiguration'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    put:
+      description: Replace a lifecycle's configuration. This is the whole
+        document, not a patch -- a key left out is a key removed.
+      operationId: lifecycle_name_put
+      tags:
+        - Lifecycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/lifecycleConfiguration'
+      responses:
+        "200":
+          description: Lifecycle updated.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    delete:
+      description: Delete a lifecycle. Fails if anything still uses it.
+      operationId: lifecycle_name_delete
+      tags:
+        - Lifecycle
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /lifecycle/{name}/maps:
+    parameters:
+      - $ref: '#/components/parameters/name'
+    get:
+      description: Get the status maps between this lifecycle and the others.
+      operationId: lifecycle_name_maps_get
+      tags:
+        - Lifecycle
+      responses:
+        "200":
+          description: Maps queried successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/lifecycleMaps'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    put:
+      description: Replace the status maps between this lifecycle and the others.
+      operationId: lifecycle_name_maps_put
+      tags:
+        - Lifecycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/lifecycleMaps'
+      responses:
+        "200":
+          description: Maps updated.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /lifecycle/{name}/validate:
+    parameters:
+      - $ref: '#/components/parameters/name'
+    post:
+      description: Check a lifecycle configuration without saving it. Answers
+        200 whether or not the configuration is valid -- read the body.
+      operationId: lifecycle_name_validate_post
+      tags:
+        - Lifecycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/lifecycleConfiguration'
+      responses:
+        "200":
+          description: The configuration was checked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  errors:
+                    type: array
+                    items:
+                      type: string
+        "401":
+          $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/values:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: List the values a Select or Combobox custom field offers.
+      operationId: customfield_id_values_get
+      tags:
+        - Custom Field
+      responses:
+        "200":
+          description: Values queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/genericObject'
+                    required:
+                      - items
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/value:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    post:
+      description: Add a value to a Select or Combobox custom field.
+      operationId: customfield_id_value_post
+      tags:
+        - Custom Field
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/customFieldValuePropertiesCommon'
+                - type: object
+                  required:
+                    - Name
+            example:
+              Name: High
+              SortOrder: "1"
+      responses:
+        "201":
+          description: Value created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/typelessGenericObject'
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/value/{valueId}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+      - name: valueId
+        in: path
+        required: true
+        description: The id of the custom field value.
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      description: Get one of a custom field's values.
+      operationId: customfield_id_value_id_get
+      tags:
+        - Custom Field
+      responses:
+        "200":
+          description: Value queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/objectMetadata'
+                  - $ref: '#/components/schemas/customFieldValuePropertiesCommon'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    put:
+      description: Update one of a custom field's values.
+      operationId: customfield_id_value_id_put
+      tags:
+        - Custom Field
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/customFieldValuePropertiesCommon'
+      responses:
+        "200":
+          description: This is returned pretty much always. You need to inspect
+            the content to figure out what happened.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    delete:
+      description: Remove one of a custom field's values.
+      operationId: customfield_id_value_id_delete
+      tags:
+        - Custom Field
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /queue/{idOrName}/rights:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    get:
+      description: List the rights granted on this queue, one entry per
+        principal and right.
+      operationId: queue_id_name_rights_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Rights queried successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rightsList'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    post:
+      description: Grant one right on this queue to one principal.
+      operationId: queue_id_name_rights_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightGrant'
+      responses:
+        "201":
+          description: Right granted successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  - "Granted right 'CreateTicket' to Staff"
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /queue/{idOrName}/rights/available:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    get:
+      description: The rights that CAN be granted on this queue, which is
+        what makes a grant's Right field checkable before it is sent.
+      operationId: queue_id_name_rights_available_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Available rights queried successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /queue/{idOrName}/rights/bulk:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    post:
+      description: Grant and revoke several rights on this queue in one
+        request.
+      operationId: queue_id_name_rights_bulk_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightsBulk'
+      responses:
+        "200":
+          description: The changes were applied. Read the body to find out what
+            happened to each one.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /queue/{idOrName}/rights/{right}/group/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the group losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this queue from one group.
+      operationId: queue_id_name_rights_right_group_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /queue/{idOrName}/rights/{right}/user/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the user losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this queue from one user.
+      operationId: queue_id_name_rights_right_user_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /group/{id}/rights:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: List the rights granted on this group, one entry per
+        principal and right.
+      operationId: group_id_rights_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Rights queried successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rightsList'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    post:
+      description: Grant one right on this group to one principal.
+      operationId: group_id_rights_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightGrant'
+      responses:
+        "201":
+          description: Right granted successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  - "Granted right 'CreateTicket' to Staff"
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /group/{id}/rights/available:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: The rights that CAN be granted on this group, which is
+        what makes a grant's Right field checkable before it is sent.
+      operationId: group_id_rights_available_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Available rights queried successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /group/{id}/rights/bulk:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    post:
+      description: Grant and revoke several rights on this group in one
+        request.
+      operationId: group_id_rights_bulk_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightsBulk'
+      responses:
+        "200":
+          description: The changes were applied. Read the body to find out what
+            happened to each one.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /group/{id}/rights/{right}/group/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the group losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this group from one group.
+      operationId: group_id_rights_right_group_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /group/{id}/rights/{right}/user/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the user losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this group from one user.
+      operationId: group_id_rights_right_user_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /class/{idOrName}/rights:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    get:
+      description: List the rights granted on this class, one entry per
+        principal and right.
+      operationId: class_id_name_rights_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Rights queried successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rightsList'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    post:
+      description: Grant one right on this class to one principal.
+      operationId: class_id_name_rights_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightGrant'
+      responses:
+        "201":
+          description: Right granted successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  - "Granted right 'CreateTicket' to Staff"
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /class/{idOrName}/rights/available:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    get:
+      description: The rights that CAN be granted on this class, which is
+        what makes a grant's Right field checkable before it is sent.
+      operationId: class_id_name_rights_available_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Available rights queried successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /class/{idOrName}/rights/bulk:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    post:
+      description: Grant and revoke several rights on this class in one
+        request.
+      operationId: class_id_name_rights_bulk_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightsBulk'
+      responses:
+        "200":
+          description: The changes were applied. Read the body to find out what
+            happened to each one.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /class/{idOrName}/rights/{right}/group/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the group losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this class from one group.
+      operationId: class_id_name_rights_right_group_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /class/{idOrName}/rights/{right}/user/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the user losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this class from one user.
+      operationId: class_id_name_rights_right_user_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /catalog/{idOrName}/rights:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    get:
+      description: List the rights granted on this catalog, one entry per
+        principal and right.
+      operationId: catalog_id_name_rights_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Rights queried successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rightsList'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    post:
+      description: Grant one right on this catalog to one principal.
+      operationId: catalog_id_name_rights_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightGrant'
+      responses:
+        "201":
+          description: Right granted successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  - "Granted right 'CreateTicket' to Staff"
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /catalog/{idOrName}/rights/available:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    get:
+      description: The rights that CAN be granted on this catalog, which is
+        what makes a grant's Right field checkable before it is sent.
+      operationId: catalog_id_name_rights_available_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Available rights queried successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /catalog/{idOrName}/rights/bulk:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+    post:
+      description: Grant and revoke several rights on this catalog in one
+        request.
+      operationId: catalog_id_name_rights_bulk_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightsBulk'
+      responses:
+        "200":
+          description: The changes were applied. Read the body to find out what
+            happened to each one.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /catalog/{idOrName}/rights/{right}/group/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the group losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this catalog from one group.
+      operationId: catalog_id_name_rights_right_group_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /catalog/{idOrName}/rights/{right}/user/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the user losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this catalog from one user.
+      operationId: catalog_id_name_rights_right_user_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/rights:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: List the rights granted on this custom field, one entry per
+        principal and right.
+      operationId: customfield_id_rights_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Rights queried successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rightsList'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    post:
+      description: Grant one right on this custom field to one principal.
+      operationId: customfield_id_rights_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightGrant'
+      responses:
+        "201":
+          description: Right granted successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  - "Granted right 'CreateTicket' to Staff"
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/rights/available:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: The rights that CAN be granted on this custom field, which is
+        what makes a grant's Right field checkable before it is sent.
+      operationId: customfield_id_rights_available_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Available rights queried successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/rights/bulk:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    post:
+      description: Grant and revoke several rights on this custom field in one
+        request.
+      operationId: customfield_id_rights_bulk_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightsBulk'
+      responses:
+        "200":
+          description: The changes were applied. Read the body to find out what
+            happened to each one.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/rights/{right}/group/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the group losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this custom field from one group.
+      operationId: customfield_id_rights_right_group_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/rights/{right}/user/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the user losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this custom field from one user.
+      operationId: customfield_id_rights_right_user_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /global/rights:
+    get:
+      description: List the rights granted on this global, one entry per
+        principal and right.
+      operationId: global_rights_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Rights queried successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rightsList'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    post:
+      description: Grant one right on this global to one principal.
+      operationId: global_rights_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightGrant'
+      responses:
+        "201":
+          description: Right granted successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  - "Granted right 'CreateTicket' to Staff"
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /global/rights/available:
+    get:
+      description: The rights that CAN be granted on this global, which is
+        what makes a grant's Right field checkable before it is sent.
+      operationId: global_rights_available_get
+      tags:
+        - Rights
+      responses:
+        "200":
+          description: Available rights queried successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /global/rights/bulk:
+    post:
+      description: Grant and revoke several rights on this global in one
+        request.
+      operationId: global_rights_bulk_post
+      tags:
+        - Rights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rightsBulk'
+      responses:
+        "200":
+          description: The changes were applied. Read the body to find out what
+            happened to each one.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /global/rights/{right}/group/{principalId}:
+    parameters:
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the group losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this global from one group.
+      operationId: global_rights_right_group_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /global/rights/{right}/user/{principalId}:
+    parameters:
+      - name: right
+        in: path
+        required: true
+        description: The right to revoke.
+        schema:
+          type: string
+          example: CreateTicket
+      - name: principalId
+        in: path
+        required: true
+        description: Name or id of the user losing the right.
+        schema:
+          type: string
+    delete:
+      description: Revoke one right on this global from one user.
+      operationId: global_rights_right_user_delete
+      tags:
+        - Rights
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /group/{id}/member/{principalId}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+      - name: principalId
+        in: path
+        required: true
+        description: So called principal id of the member to remove.
+        schema:
+          type: integer
+          minimum: 1
+    delete:
+      description: Remove one member from a group.
+      operationId: group_id_member_id_delete
+      tags:
+        - Group Memberships
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /user/{idOrName}/group/{groupId}:
+    parameters:
+      - $ref: '#/components/parameters/idOrName'
+      - name: groupId
+        in: path
+        required: true
+        description: Id of the group to remove the user from.
+        schema:
+          type: integer
+          minimum: 1
+    delete:
+      description: Remove a user from one group.
+      operationId: user_name_group_id_delete
+      tags:
+        - User Memberships
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
         default:
           description: Unexpected error.
