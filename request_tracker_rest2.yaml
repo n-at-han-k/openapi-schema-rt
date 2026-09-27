@@ -2857,9 +2857,10 @@ paths:
                       Status:
                         type: string
                       Owner:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/userReference'
+                        # ONE user, not a list -- unlike HeldBy and Contact
+                        # below. `GET /asset/3` answers
+                        # `"Owner":{"type":"user","id":"Nobody",...}`.
+                        $ref: '#/components/schemas/userReference'
                       HeldBy:
                         type: array
                         items:
