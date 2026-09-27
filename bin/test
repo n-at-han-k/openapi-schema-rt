@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# The conformance suite, against a real RT.
+#
+#   bin/test                          every read operation
+#   bin/test --mutate                 also the creates, updates and deletes
+#   bin/test spec/api/queue_spec.rb   one file, or any other rspec argument
+#
+# RT_URL and RT_TOKEN come from .env (see .env.example). --mutate is the same
+# as RT_MUTATE=1 and is spelled as a flag because that is the decision worth
+# making deliberately: it writes to the RT you point it at. Only at objects it
+# makes and removes -- never at anything that was there beforehand -- but it
+# writes.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+arguments=()
+
+for argument in "$@"; do
+  case "$argument" in
+    --mutate) export RT_MUTATE=1 ;;
+    *) arguments+=("$argument") ;;
+  esac
+done
+
+test -f .env || {
+  echo "no .env -- copy .env.example and fill in RT_URL and RT_TOKEN" >&2
+  exit 1
+}
+
+exec rspec "${arguments[@]}"

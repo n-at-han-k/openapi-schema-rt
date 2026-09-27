@@ -127,8 +127,7 @@ public class RspecCodegen extends RubyClientCodegen {
 
                     // The source operation, spelled as Ruby for the runner to
                     // make before the target one.
-                    setupFor.put(link.getOperationId(),
-                            "{ method: '" + verb.name() + "', path: '" + path + "' }");
+                    setupFor.put(link.getOperationId(), verb.name() + "|" + path);
                 });
             });
         }));
@@ -144,14 +143,121 @@ public class RspecCodegen extends RubyClientCodegen {
                     || method.equals("DELETE")
                     || (method.equals("POST") && answers(op, "201"));
 
-            op.vendorExtensions.put("x-mutating", mutating);
-            op.vendorExtensions.put("x-params", params(op, mutating));
-            op.vendorExtensions.put("x-query", query(op));
-            op.vendorExtensions.put("x-body", body(op, allModels));
-            op.vendorExtensions.put("x-setup", setupFor.getOrDefault(op.operationId, "nil"));
+            op.vendorExtensions.put("x-tags", op.tags == null ? List.of()
+                    : op.tags.stream().map(tag -> tag.getName()).toList());
+            op.vendorExtensions.put("x-checked", List.of(checked(op, allModels, mutating)));
         }
 
         return processed;
+    }
+
+    /**
+     * The one response this suite exercises, and everything the example needs
+     * to provoke it.
+     *
+     * The success response: an operation has one, and the failures are
+     * documented for the sake of the document rather than to be provoked --
+     * making RT answer its own 400 means sending a request the document says
+     * is invalid, which openapi-ruby validates and refuses before it is sent.
+     */
+    private Map<String, Object> checked(CodegenOperation op, List<ModelMap> allModels, boolean mutating) {
+        Map<String, Object> checked = new LinkedHashMap<>();
+
+        String code = success(op);
+        checked.put("code", code);
+        checked.put("description", description(op, code));
+        checked.put("hasSchema", hasSchema(op, code));
+        checked.put("mutating", mutating);
+
+        List<Map<String, Object>> params = new ArrayList<>();
+        if (op.pathParams != null) {
+            for (CodegenParameter param : op.pathParams) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("name", param.paramName);
+                entry.put("value", mutating
+                        ? scratchFor(op.path, param.baseName)
+                        : literal(example(param)));
+                params.add(entry);
+            }
+        }
+        if (op.queryParams != null) {
+            for (CodegenParameter param : op.queryParams) {
+                Object value = example(param);
+                if (value == null) {
+                    continue;
+                }
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("name", param.paramName);
+                entry.put("value", literal(value));
+                params.add(entry);
+            }
+        }
+        checked.put("params", params);
+
+        String body = op.bodyParam == null ? null : body(op, allModels);
+        checked.put("hasBody", body != null);
+        checked.put("body", body);
+
+        String setup = setupFor.get(op.operationId);
+        checked.put("hasSetup", setup != null);
+        if (setup != null) {
+            checked.put("setupMethod", setup.split("\\|")[0]);
+            checked.put("setupPath", setup.split("\\|")[1]);
+            checked.put("setupParams", setupParams(op));
+        }
+
+        return checked;
+    }
+
+    /** The parameters a setup request shares with the operation it precedes. */
+    private String setupParams(CodegenOperation op) {
+        List<String> entries = new ArrayList<>();
+
+        if (op.pathParams != null) {
+            for (CodegenParameter param : op.pathParams) {
+                entries.add("'" + param.baseName + "' => " + param.paramName);
+            }
+        }
+
+        return "{ " + String.join(", ", entries) + " }";
+    }
+
+    private String success(CodegenOperation op) {
+        if (op.responses != null) {
+            for (String wanted : List.of("200", "201", "204")) {
+                if (answers(op, wanted)) {
+                    return wanted;
+                }
+            }
+        }
+
+        return "200";
+    }
+
+    private String description(CodegenOperation op, String code) {
+        if (op.responses != null) {
+            for (var response : op.responses) {
+                if (code.equals(response.code) && response.message != null) {
+                    return response.message.replace("\"", "'").lines().findFirst().orElse(code);
+                }
+            }
+        }
+
+        return "answers " + code;
+    }
+
+    private boolean hasSchema(CodegenOperation op, String code) {
+        if (op.responses == null) {
+            return false;
+        }
+
+        for (var response : op.responses) {
+            if (code.equals(response.code)) {
+                return response.dataType != null && !response.dataType.isEmpty();
+            }
+        }
+
+        return false;
     }
 
     private boolean answers(CodegenOperation op, String code) {

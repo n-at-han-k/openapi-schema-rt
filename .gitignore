@@ -43,3 +43,4 @@ build/
 
 # The token. .env.example is the template.
 /.env
+result
