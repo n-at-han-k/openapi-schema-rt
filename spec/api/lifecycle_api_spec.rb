@@ -32,6 +32,8 @@ RSpec.describe "LifecycleApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:name) { scratch(:lifecycle) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("lifecycle") }
         run_test!
       end
     end
@@ -61,7 +63,7 @@ RSpec.describe "LifecycleApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:name) { scratch(:lifecycle) }
-        let(:request_body) { {} }
+        let(:request_body) { { 'type' => 'ticket' } }
         run_test!
       end
     end
@@ -96,7 +98,7 @@ RSpec.describe "LifecycleApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:name) { scratch(:lifecycle) }
-        let(:request_body) { JSON.parse('Object') }
+        let(:request_body) { RT.with_scratch(JSON.parse('Object'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -115,8 +117,12 @@ RSpec.describe "LifecycleApi", type: :openapi do
 
       response 200, "The configuration was checked." do
         schema RT.response_schema("/lifecycle/{name}/validate", "post", "200")
-        let(:name) { 'default' }
-        let(:request_body) { {} }
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:name) { scratch(:lifecycle) }
+        let(:request_body) { { 'type' => 'ticket' } }
         run_test!
       end
     end
@@ -148,7 +154,7 @@ RSpec.describe "LifecycleApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Name' => unique('conf'), 'Type' => 'ticket' } }
         run_test!
       end
     end

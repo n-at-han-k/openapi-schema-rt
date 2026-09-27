@@ -32,6 +32,8 @@ RSpec.describe "ClassApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:idOrName) { scratch(:class) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("class") }
         run_test!
       end
     end
@@ -61,7 +63,7 @@ RSpec.describe "ClassApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:idOrName) { scratch(:class) }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Name' => unique('conf') } }
         run_test!
       end
     end
@@ -82,7 +84,7 @@ RSpec.describe "ClassApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { JSON.parse('{"Name":"Runbooks"}') }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Name":"Runbooks"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end

@@ -32,6 +32,8 @@ RSpec.describe "GroupApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:group) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("group") }
         run_test!
       end
     end
@@ -42,7 +44,7 @@ RSpec.describe "GroupApi", type: :openapi do
 
       response 200, "Group info fetched successfully." do
         schema RT.response_schema("/group/{id}", "get", "200")
-        let(:id) { '1' }
+        let(:id) { '2' }
         run_test!
       end
     end
@@ -61,7 +63,7 @@ RSpec.describe "GroupApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:group) }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Name' => unique('conf') } }
         run_test!
       end
     end
@@ -82,25 +84,7 @@ RSpec.describe "GroupApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { {} }
-        run_test!
-      end
-    end
-  end
-
-  path "/groups" do
-
-    post "POST /groups" do
-      operationId "groups_post"
-      tags "Group"
-      request_body required: false, content: {
-        "application/json" => { schema: RT.body_schema("/groups", "post") }
-      }
-
-      response 200, "No errors" do
-        schema RT.response_schema("/groups", "post", "200")
-        let(:query) { 'query_example' }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Name' => unique('conf') } }
         run_test!
       end
     end

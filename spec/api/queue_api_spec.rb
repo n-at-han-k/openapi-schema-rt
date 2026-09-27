@@ -32,6 +32,8 @@ RSpec.describe "QueueApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:idOrName) { scratch(:queue) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("queue") }
         run_test!
       end
     end
@@ -61,7 +63,7 @@ RSpec.describe "QueueApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:idOrName) { scratch(:queue) }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Name' => unique('conf') } }
         run_test!
       end
     end
@@ -82,7 +84,7 @@ RSpec.describe "QueueApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Name' => unique('conf') } }
         run_test!
       end
     end

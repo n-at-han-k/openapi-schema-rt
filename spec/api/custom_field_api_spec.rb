@@ -79,7 +79,7 @@ RSpec.describe "CustomFieldApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:customfield) }
-        let(:request_body) { JSON.parse('{"ObjectId":1}') }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"ObjectId":1}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -105,6 +105,8 @@ RSpec.describe "CustomFieldApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/customfield/{id}/appliesto", { 'id' => id, 'objectId' => object_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("customfield") }
         run_test!
       end
     end
@@ -124,6 +126,8 @@ RSpec.describe "CustomFieldApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:customfield) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("customfield") }
         run_test!
       end
     end
@@ -153,7 +157,7 @@ RSpec.describe "CustomFieldApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:customfield) }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Name' => unique('conf'), 'Type' => 'HTML', 'LookupType' => '' } }
         run_test!
       end
     end
@@ -176,6 +180,8 @@ RSpec.describe "CustomFieldApi", type: :openapi do
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:customfield) }
         let(:valueId) { :scratch_value }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("customfield") }
         run_test!
       end
     end
@@ -187,7 +193,7 @@ RSpec.describe "CustomFieldApi", type: :openapi do
       response 200, "Value queried successfully." do
         schema RT.response_schema("/customfield/{id}/value/{valueId}", "get", "200")
         let(:id) { '1' }
-        let(:valueId) { '56' }
+        let(:valueId) { '1' }
         run_test!
       end
     end
@@ -207,7 +213,7 @@ RSpec.describe "CustomFieldApi", type: :openapi do
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:customfield) }
         let(:valueId) { :scratch_value }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Name' => unique('conf') } }
         run_test!
       end
     end
@@ -231,7 +237,7 @@ RSpec.describe "CustomFieldApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:customfield) }
-        let(:request_body) { JSON.parse('{"Name":"High","SortOrder":"1"}') }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Name":"High","SortOrder":"1"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -268,24 +274,7 @@ RSpec.describe "CustomFieldApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { JSON.parse('{"Name":"Delivery Date","Type":"Date","MaxValues":"1","LookupType":"RT::Queue-RT::Ticket"}') }
-        run_test!
-      end
-    end
-  end
-
-  path "/customfields" do
-
-    post "POST /customfields" do
-      operationId "customfields_post"
-      tags "Custom Field"
-      request_body required: false, content: {
-        "application/json" => { schema: RT.body_schema("/customfields", "post") }
-      }
-
-      response 200, "No errors" do
-        schema RT.response_schema("/customfields", "post", "200")
-        let(:request_body) { {} }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Name":"Delivery Date","Type":"Date","MaxValues":"1","LookupType":"RT::Queue-RT::Ticket"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end

@@ -145,9 +145,13 @@ public class RspecCodegen extends RubyClientCodegen {
 
         for (CodegenOperation op : processed.getOperations().getOperation()) {
             String method = op.httpMethod.toUpperCase(Locale.ROOT);
+            // Every POST this document describes is a write. It used to
+            // need "and answers 201" to tell RT's creates from its searches,
+            // which POST too -- but the searches are not described here, and
+            // the ones that remain all change something: a grant, a bulk
+            // grant, an application of a custom field.
             boolean mutating = method.equals("PUT") || method.equals("PATCH")
-                    || method.equals("DELETE")
-                    || (method.equals("POST") && answers(op, "201"));
+                    || method.equals("DELETE") || method.equals("POST");
 
             Map<String, Object> declared = new LinkedHashMap<>();
             declared.put("verb", method.toLowerCase(Locale.ROOT));
@@ -244,6 +248,13 @@ public class RspecCodegen extends RubyClientCodegen {
         String body = op.bodyParam == null ? null : body(op, allModels);
         checked.put("hasBody", body != null);
         checked.put("body", body);
+
+        // A delete removes the scratch object it was aimed at, and the next
+        // example that wants one of those must make a new one rather than
+        // reuse the id of something RT has just disabled.
+        boolean removes = "DELETE".equals(op.httpMethod.toUpperCase(Locale.ROOT));
+        checked.put("forgets", removes ? subjectOf(op.path) : null);
+        checked.put("hasForget", removes && SCRATCH.contains(subjectOf(op.path)));
 
         String setup = setupFor.get(op.operationId);
 
@@ -419,10 +430,21 @@ public class RspecCodegen extends RubyClientCodegen {
         // A body the document gives an example for is used verbatim: it is
         // the document's own answer to "what does a request look like".
         if (op.bodyParam.example != null && !op.bodyParam.example.isEmpty()) {
-            return "JSON.parse(" + literal(op.bodyParam.example) + ")";
+            // The document's own example, with the objects it names swapped
+            // for scratch ones. `Group: Everyone` is the right thing for a
+            // document to say and the wrong thing for a suite to do twice --
+            // RT answers 400 to granting a right a principal already has.
+            String references = REFERENCES.entrySet().stream()
+                    .map(entry -> "'" + entry.getKey() + "' => :" + entry.getValue())
+                    .reduce((a, b) -> a + ", " + b)
+                    .orElse("");
+
+            return "RT.with_scratch(JSON.parse(" + literal(op.bodyParam.example)
+                    + "), { " + references + " })";
         }
 
         CodegenModel model = modelFor(op.bodyParam, allModels);
+
 
         if (model == null) {
             return op.bodyParam.isArray ? "[]" : "{}";
@@ -432,20 +454,34 @@ public class RspecCodegen extends RubyClientCodegen {
         List<CodegenProperty> properties =
                 model.allVars != null && !model.allVars.isEmpty() ? model.allVars : model.vars;
 
+        boolean named = false;
+
         for (CodegenProperty property : properties) {
-            if (!property.required) {
+            boolean reference = REFERENCES.containsKey(property.baseName);
+
+            // Required, or the thing the request is ABOUT. A grant declares
+            // only `Right` required, because the principal may be spelled
+            // either Group or User -- and a grant to neither is a 400. The
+            // first reference field is sent; the second would name a second
+            // principal.
+            if (!property.required && !(reference && !named)) {
                 continue;
+            }
+
+            if (reference && !property.required) {
+                named = true;
             }
 
             entries.add("'" + property.baseName + "' => " + value(property));
         }
 
-        // Nothing required: send the smallest thing that is still a change,
-        // which is the first optional scalar the schema offers.
+        // Nothing the schema marks required: send the smallest thing that is
+        // still a change, which is the first scalar it offers -- valued the
+        // same way as any other field, so a Name is still unique.
         if (entries.isEmpty()) {
             for (CodegenProperty property : properties) {
                 if (property.isString && !REFERENCES.containsKey(property.baseName)) {
-                    entries.add("'" + property.baseName + "' => 'conformance suite'");
+                    entries.add("'" + property.baseName + "' => " + value(property));
                     break;
                 }
             }
@@ -477,16 +513,18 @@ public class RspecCodegen extends RubyClientCodegen {
                     : "scratch(:" + reference + ")";
         }
 
+        // Before the example, not after it: the document's example for a
+        // Name is a good name and a TAKEN one by the second run. RT refuses a
+        // name it already has, and its deletes only disable, so the name is
+        // never free again.
+        if ("Name".equals(property.baseName) || "Subject".equals(property.baseName)) {
+            return "unique('conf')";
+        }
         if (property._enum != null && !property._enum.isEmpty()) {
             return literal(String.valueOf(property._enum.get(0)));
         }
         if (property.example != null && !property.example.isEmpty()) {
             return literal(property.example);
-        }
-        if ("Name".equals(property.baseName) || "Subject".equals(property.baseName)) {
-            // Unique, because RT refuses a name it already has and its
-            // deletes only disable.
-            return "unique('conf')";
         }
         if (property.isInteger || property.isLong || property.isNumber) {
             return "1";

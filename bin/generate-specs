@@ -11,11 +11,15 @@ cd "$(dirname "$0")/.."
 
 rm -rf spec/api
 
+# `models` rather than models=false: the generator needs the request models
+# in MEMORY to know which fields a create requires. None are written to disk
+# -- the codegen clears modelTemplateFiles -- but without this they are never
+# built, and every generated request body comes out empty.
 openapi-generator-rt-rspec generate \
   -i request_tracker_rest2.yaml \
   -g rt-rspec \
   -o . \
-  --global-property apis,apiTests=true,models=false,modelTests=false,supportingFiles=false \
+  --global-property apis,apiTests=true,models,modelTests=false,supportingFiles=false \
   --additional-properties=gemName=rt,moduleName=RT
 
 # The generator's own bookkeeping. NOT lib/: that is lib/schemas.rb, which

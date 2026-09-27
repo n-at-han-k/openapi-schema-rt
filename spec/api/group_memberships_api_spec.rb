@@ -35,6 +35,8 @@ RSpec.describe "GroupMembershipsApi", type: :openapi do
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:group) }
         let(:principalId) { scratch(:group) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("group") }
         run_test!
       end
     end
@@ -54,6 +56,8 @@ RSpec.describe "GroupMembershipsApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:group) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("group") }
         run_test!
       end
     end

@@ -32,6 +32,8 @@ RSpec.describe "UserApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:idOrName) { scratch(:user) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("user") }
         run_test!
       end
     end
@@ -42,7 +44,7 @@ RSpec.describe "UserApi", type: :openapi do
 
       response 200, "Successfully fetched user info." do
         schema RT.response_schema("/user/{idOrName}", "get", "200")
-        let(:idOrName) { 'General' }
+        let(:idOrName) { 'root' }
         run_test!
       end
     end
@@ -61,7 +63,7 @@ RSpec.describe "UserApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:idOrName) { scratch(:user) }
-        let(:request_body) { {} }
+        let(:request_body) { { 'RealName' => 'null' } }
         run_test!
       end
     end
@@ -82,24 +84,7 @@ RSpec.describe "UserApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { JSON.parse('{"Name":"NewUser","Privileged":1,"Password":"Color Out of Space is an intriguing story by Lovecraft."}') }
-        run_test!
-      end
-    end
-  end
-
-  path "/users" do
-
-    post "POST /users" do
-      operationId "users_get"
-      tags "User"
-      request_body required: false, content: {
-        "application/json" => { schema: RT.body_schema("/users", "post") }
-      }
-
-      response 200, "Search successful" do
-        schema RT.response_schema("/users", "post", "200")
-        let(:request_body) { JSON.parse('[{"field":"Name","value":"userid","operator":"LIKE"}]') }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Name":"NewUser","Privileged":1,"Password":"Color Out of Space is an intriguing story by Lovecraft."}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end

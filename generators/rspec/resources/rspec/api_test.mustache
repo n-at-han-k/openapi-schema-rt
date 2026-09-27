@@ -60,6 +60,10 @@ RSpec.describe "{{classname}}", type: :openapi do
 {{#hasBody}}
         let(:request_body) { {{{body}}} }
 {{/hasBody}}
+{{#hasForget}}
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("{{forgets}}") }
+{{/hasForget}}
         run_test!
       end
 {{/checked}}

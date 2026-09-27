@@ -32,6 +32,8 @@ RSpec.describe "TicketApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:ticket) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("ticket") }
         run_test!
       end
     end
@@ -61,7 +63,7 @@ RSpec.describe "TicketApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:ticket) }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Owner' => scratch(:user) } }
         run_test!
       end
     end
@@ -82,22 +84,7 @@ RSpec.describe "TicketApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { {} }
-        run_test!
-      end
-    end
-  end
-
-  path "/tickets" do
-
-    get "GET /tickets" do
-      operationId "tickets_get"
-      tags "Ticket"
-
-      response 200, "No errors" do
-        schema RT.response_schema("/tickets", "get", "200")
-        let(:query) { 'query_example' }
-        let(:search) { 'search_example' }
+        let(:request_body) { { 'Owner' => scratch(:user), 'Queue' => scratch(:queue) } }
         run_test!
       end
     end

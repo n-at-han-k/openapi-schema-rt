@@ -47,7 +47,7 @@ RSpec.describe "AssetApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:asset) }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Catalog' => scratch(:catalog) } }
         run_test!
       end
     end
@@ -68,21 +68,7 @@ RSpec.describe "AssetApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { JSON.parse('{"Name":"nathans-laptop","Catalog":"Laptops","Status":"in-use"}') }
-        run_test!
-      end
-    end
-  end
-
-  path "/assets" do
-
-    get "GET /assets" do
-      operationId "assets_get"
-      tags "Asset"
-
-      response 200, "Assets queried successfully." do
-        schema RT.response_schema("/assets", "get", "200")
-        let(:query) { 'query_example' }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Name":"nathans-laptop","Catalog":"Laptops","Status":"in-use"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end

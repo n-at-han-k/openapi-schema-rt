@@ -32,6 +32,8 @@ RSpec.describe "ArticleApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:article) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("article") }
         run_test!
       end
     end
@@ -61,7 +63,7 @@ RSpec.describe "ArticleApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:article) }
-        let(:request_body) { {} }
+        let(:request_body) { { 'Class' => scratch(:class) } }
         run_test!
       end
     end
@@ -82,24 +84,7 @@ RSpec.describe "ArticleApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { JSON.parse('{"Name":"How to restart the widget service","Class":"Runbooks"}') }
-        run_test!
-      end
-    end
-  end
-
-  path "/articles" do
-
-    post "POST /articles" do
-      operationId "articles_get"
-      tags "Article"
-      request_body required: false, content: {
-        "application/json" => { schema: RT.body_schema("/articles", "post") }
-      }
-
-      response 200, "Articles queried successfully." do
-        schema RT.response_schema("/articles", "post", "200")
-        let(:request_body) { {} }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Name":"How to restart the widget service","Class":"Runbooks"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end

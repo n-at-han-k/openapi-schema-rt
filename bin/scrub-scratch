@@ -21,8 +21,10 @@ require 'dotenv'
 
 Dotenv.load(File.expand_path('../.env', __dir__))
 
-URL   = ENV.fetch('RT_URL')
-TOKEN = ENV.fetch('RT_TOKEN')
+URL      = ENV.fetch('RT_URL')
+TOKEN    = ENV.fetch('RT_TOKEN', '')
+USER     = ENV.fetch('RT_USER', '')
+PASSWORD = ENV.fetch('RT_PASSWORD', '')
 BASE  = "#{URL}/REST/2.0"
 FORCE = ARGV.include?('--force')
 
@@ -33,7 +35,11 @@ MINE = /\A(conf-|conformance-)/
 def call(method, path, body = nil)
   uri = URI.parse(BASE + path)
   request = Net::HTTP.const_get(method.capitalize).new(uri)
-  request['Authorization'] = "token #{TOKEN}"
+  if TOKEN.empty?
+    request.basic_auth(USER, PASSWORD)
+  else
+    request['Authorization'] = "token #{TOKEN}"
+  end
   request['Accept'] = 'application/json'
 
   if body

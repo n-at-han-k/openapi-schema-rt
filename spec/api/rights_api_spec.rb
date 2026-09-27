@@ -28,7 +28,7 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "Available rights queried successfully." do
         schema RT.response_schema("/catalog/{idOrName}/rights/available", "get", "200")
-        let(:idOrName) { 'General' }
+        let(:idOrName) { '1' }
         run_test!
       end
     end
@@ -47,8 +47,12 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "The changes were applied. Read the body to find out what happened to each one." do
         schema RT.response_schema("/catalog/{idOrName}/rights/bulk", "post", "200")
-        let(:idOrName) { 'General' }
-        let(:request_body) { {} }
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:idOrName) { scratch(:catalog) }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"grant":[{"Right":"ShowCatalog","Group":"Everyone"}]}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -64,7 +68,7 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "Rights queried successfully." do
         schema RT.response_schema("/catalog/{idOrName}/rights", "get", "200")
-        let(:idOrName) { 'General' }
+        let(:idOrName) { '1' }
         run_test!
       end
     end
@@ -83,7 +87,7 @@ RSpec.describe "RightsApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:idOrName) { scratch(:catalog) }
-        let(:request_body) { {} }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Right":"ShowCatalog","Group":"Everyone"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -112,6 +116,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/catalog/{idOrName}/rights", { 'idOrName' => id_or_name, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("catalog") }
         run_test!
       end
     end
@@ -140,6 +146,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/catalog/{idOrName}/rights", { 'idOrName' => id_or_name, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("catalog") }
         run_test!
       end
     end
@@ -174,8 +182,12 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "The changes were applied. Read the body to find out what happened to each one." do
         schema RT.response_schema("/class/{idOrName}/rights/bulk", "post", "200")
-        let(:idOrName) { 'General' }
-        let(:request_body) { {} }
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:idOrName) { scratch(:class) }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"grant":[{"Right":"ShowArticle","Group":"Everyone"}]}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -210,7 +222,7 @@ RSpec.describe "RightsApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:idOrName) { scratch(:class) }
-        let(:request_body) { {} }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Right":"ShowArticle","Group":"Everyone"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -239,6 +251,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/class/{idOrName}/rights", { 'idOrName' => id_or_name, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("class") }
         run_test!
       end
     end
@@ -267,6 +281,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/class/{idOrName}/rights", { 'idOrName' => id_or_name, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("class") }
         run_test!
       end
     end
@@ -301,8 +317,12 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "The changes were applied. Read the body to find out what happened to each one." do
         schema RT.response_schema("/customfield/{id}/rights/bulk", "post", "200")
-        let(:id) { '1' }
-        let(:request_body) { {} }
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:id) { scratch(:customfield) }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"grant":[{"Right":"SeeCustomField","Group":"Everyone"}]}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -337,7 +357,7 @@ RSpec.describe "RightsApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:customfield) }
-        let(:request_body) { {} }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Right":"SeeCustomField","Group":"Everyone"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -366,6 +386,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/customfield/{id}/rights", { 'id' => id, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("customfield") }
         run_test!
       end
     end
@@ -394,6 +416,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/customfield/{id}/rights", { 'id' => id, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("customfield") }
         run_test!
       end
     end
@@ -423,7 +447,11 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "The changes were applied. Read the body to find out what happened to each one." do
         schema RT.response_schema("/global/rights/bulk", "post", "200")
-        let(:request_body) { {} }
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"grant":[{"Right":"ShowConfigTab","Group":"Everyone"}]}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -454,7 +482,7 @@ RSpec.describe "RightsApi", type: :openapi do
         # never at anything that was in RT beforehand -- but it writes, so it
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
-        let(:request_body) { {} }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Right":"ShowConfigTab","Group":"Everyone"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -520,7 +548,7 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "Available rights queried successfully." do
         schema RT.response_schema("/group/{id}/rights/available", "get", "200")
-        let(:id) { '1' }
+        let(:id) { '2' }
         run_test!
       end
     end
@@ -539,8 +567,12 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "The changes were applied. Read the body to find out what happened to each one." do
         schema RT.response_schema("/group/{id}/rights/bulk", "post", "200")
-        let(:id) { '1' }
-        let(:request_body) { {} }
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:id) { scratch(:group) }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"grant":[{"Right":"SeeGroup","Group":"Everyone"}]}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -556,7 +588,7 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "Rights queried successfully." do
         schema RT.response_schema("/group/{id}/rights", "get", "200")
-        let(:id) { '1' }
+        let(:id) { '2' }
         run_test!
       end
     end
@@ -575,7 +607,7 @@ RSpec.describe "RightsApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:id) { scratch(:group) }
-        let(:request_body) { {} }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Right":"SeeGroup","Group":"Everyone"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -604,6 +636,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/group/{id}/rights", { 'id' => id, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("group") }
         run_test!
       end
     end
@@ -632,6 +666,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/group/{id}/rights", { 'id' => id, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("group") }
         run_test!
       end
     end
@@ -666,8 +702,12 @@ RSpec.describe "RightsApi", type: :openapi do
 
       response 200, "The changes were applied. Read the body to find out what happened to each one." do
         schema RT.response_schema("/queue/{idOrName}/rights/bulk", "post", "200")
-        let(:idOrName) { 'General' }
-        let(:request_body) { {} }
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:idOrName) { scratch(:queue) }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"grant":[{"Right":"SeeQueue","Group":"Everyone"}]}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -702,7 +742,7 @@ RSpec.describe "RightsApi", type: :openapi do
         # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
         let(:idOrName) { scratch(:queue) }
-        let(:request_body) { {} }
+        let(:request_body) { RT.with_scratch(JSON.parse('{"Right":"SeeQueue","Group":"Everyone"}'), { 'Owner' => :user, 'Class' => :class, 'Group' => :group, 'Catalog' => :catalog, 'ObjectId' => :queue, 'User' => :user, 'Queue' => :queue }) }
         run_test!
       end
     end
@@ -731,6 +771,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/queue/{idOrName}/rights", { 'idOrName' => id_or_name, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("queue") }
         run_test!
       end
     end
@@ -759,6 +801,8 @@ RSpec.describe "RightsApi", type: :openapi do
         # What has to exist first, from the document's own link between the two
         # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("POST", "/queue/{idOrName}/rights", { 'idOrName' => id_or_name, 'right' => right, 'principalId' => principal_id }) }
+        # What this removed is gone: the next example that needs one makes it.
+        after { RT::Scratch.forget("queue") }
         run_test!
       end
     end

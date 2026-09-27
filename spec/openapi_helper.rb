@@ -73,6 +73,67 @@ module RT
   end
 
   VERBS = %w[get put post delete patch].freeze
+
+  Response = Struct.new(:status, :body, :raw)
+
+  # One request, outside the DSL. spec/scratch.rb makes the objects the
+  # mutating examples are aimed at, and a generated example calls setup for a
+  # precondition the document declares -- neither goes through rack-test,
+  # because neither is the thing being tested.
+  def call(method, path, fixture = {})
+    uri = URI.parse(URL + DOC.fetch("servers").first.fetch("url") + path)
+    uri.query = fixture["query"] if fixture["query"]
+
+    request = Net::HTTP.const_get(method.capitalize).new(uri)
+
+    if TOKEN.empty?
+      request.basic_auth(USER, PASSWORD)
+    else
+      request["Authorization"] = "token #{TOKEN}"
+    end
+    request["Accept"] = "application/json"
+
+    if fixture.key?("body")
+      request["Content-Type"] = "application/json"
+      request.body = JSON.dump(fixture["body"])
+    end
+
+    raw = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https") { |http|
+      http.request(request)
+    }
+
+    body = begin
+      raw.body.to_s.strip.empty? ? nil : JSON.parse(raw.body)
+    rescue JSON::ParserError
+      nil
+    end
+
+    Response.new(raw.code, body, raw.body.to_s)
+  end
+
+  # The document's example, with the objects it names replaced by scratch
+  # ones. WHICH fields name an object is the generator's decision and arrives
+  # as `references`; this only applies it.
+  def with_scratch(node, references)
+    case node
+    when Hash
+      node.to_h do |key, value|
+        kind = references[key]
+        [key, kind && !value.is_a?(Hash) && !value.is_a?(Array) ? Scratch.fetch(kind.to_s) : with_scratch(value, references)]
+      end
+    when Array then node.map { |value| with_scratch(value, references) }
+    else node
+    end
+  end
+
+  # A precondition the document declares through a link: RT answers 500 to a
+  # revoke of a right it never granted, so the grant is made first.
+  def setup(method, path, params)
+    target = path.gsub(/\{(\w+)\}/) { URI.encode_www_form_component(params.fetch(Regexp.last_match(1), "").to_s) }
+    body = params.key?("right") ? { "Right" => params["right"], "Group" => params["principalId"] } : nil
+
+    call(method, target, body.nil? ? {} : { "body" => body })
+  end
 end
 
 module RT
@@ -158,6 +219,21 @@ OpenapiRuby.configure do |config|
   # The middleware is for an app that serves the API. RT serves this one.
   config.request_validation = :disabled
   config.response_validation = :disabled
+end
+
+# What a generated example calls for a value it must not take from real data.
+# Which kinds exist, and which parameter wants which, is the generator's
+# decision; making and removing them is spec/scratch.rb's.
+def scratch(kind)
+  RT::Scratch.fetch(kind.to_s)
+end
+
+def scratch_value
+  RT::Scratch.fetch_value
+end
+
+def unique(prefix)
+  RT::Scratch.name(prefix)
 end
 
 RSpec.configure do |config|

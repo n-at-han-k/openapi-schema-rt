@@ -1122,6 +1122,19 @@ components:
           description: Name or id of the user receiving the right.
       required:
         - Right
+    rightsBulkOutcome:
+      description: What became of one grant or revoke in a bulk request.
+      type: object
+      properties:
+        Right:
+          type: string
+        status:
+          description: The status this one change would have answered on its own.
+          type: integer
+        Group:
+          $ref: '#/components/schemas/principalReference'
+        User:
+          $ref: '#/components/schemas/principalReference'
     rightsBulk:
       description: Rights to grant and to revoke in one request.
       type: object
@@ -1170,6 +1183,44 @@ components:
                   User:
                     $ref: '#/components/schemas/principalReference'
   parameters:
+    userIdOrName:
+      name: idOrName
+      in: path
+      required: true
+      description: Name or id of the user.
+      # root exists on every RT; General does not.
+      example: root
+      schema:
+        oneOf:
+          - type: integer
+            minimum: 1
+            description: Id of the user
+          - type: string
+            description: Name of the user
+    catalogIdOrName:
+      name: idOrName
+      in: path
+      required: true
+      description: Name or id of the catalog.
+      # RT's initial data makes one catalog, and it is the first.
+      example: 1
+      schema:
+        oneOf:
+          - type: integer
+            minimum: 1
+            description: Id of the catalog
+          - type: string
+            description: Name of the catalog
+    groupRecordId:
+      name: id
+      in: path
+      required: true
+      description: The id of the group.
+      # 1 is not a group on a fresh RT; the system groups start at 2.
+      example: 2
+      schema:
+        type: integer
+        minimum: 1
     id:
       name: id
       in: path
@@ -1258,45 +1309,6 @@ paths:
           $ref: '#/components/responses/401'
         default:
           description: Unexpected error.
-  /users:
-    # There's also a get version of this, but it takes arguments in query so it's a mess.
-    # JSON content version is much nicer.
-    post:
-      operationId: users_get
-      description: Search for users
-      tags:
-        - User
-      requestBody:
-        description: Search terms
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/jsonSearch'
-            examples:
-              usersByName:
-                description: Searching for a user by name
-                value:
-                  - field: Name
-                    value: userid
-                    operator: LIKE
-      responses:
-        "200":
-          description: Search successful
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/paginated'
-                  - type: object
-                    properties:
-                      items:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/userReference'
-        "401":
-          $ref: '#/components/responses/401'
-        default:
-          description: Unexpected error.
   /user:
     post:
       description: Create a new user.
@@ -1366,7 +1378,7 @@ paths:
           description: Unexpected error.
   /user/{idOrName}:
     parameters:
-      - $ref: '#/components/parameters/idOrName'
+      - $ref: '#/components/parameters/userIdOrName'
     get:
       description: Get information about a user.
       operationId: user_id_name_get
@@ -1518,7 +1530,7 @@ paths:
           description: Unexpected error.
   /user/{idOrName}/groups:
     parameters:
-      - $ref: '#/components/parameters/idOrName'
+      - $ref: '#/components/parameters/userIdOrName'
     put:
       description: Add user to groups.
       operationId: user_name_groups_put
@@ -1592,36 +1604,6 @@ paths:
           $ref: '#/components/responses/doubleDeletion'
         default:
           description: Unexpected error.
-  /groups:
-    parameters:
-      - $ref: '#/components/parameters/query'
-    post:
-      description: Search for groups.
-      operationId: groups_post
-      tags:
-        - Group
-      requestBody:
-        $ref: '#/components/requestBodies/jsonSearch'
-      responses:
-        "200":
-          description: No errors
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/paginated'
-                  - type: object
-                    properties:
-                      items:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/groupReference'
-        "400":
-          $ref: '#/components/responses/400'
-        "401":
-          $ref: '#/components/responses/401'
-        default:
-          description: Unexpected error.
   /group:
     post:
       description: Create a group.
@@ -1665,7 +1647,7 @@ paths:
           description: Unexpected error.
   /group/{id}:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/groupRecordId'
     get:
       description: Get info about a group.
       operationId: group_id_get
@@ -1780,7 +1762,7 @@ paths:
           description: Unexpected error.
   /group/{id}/members:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/groupRecordId'
     put:
       description: Add users and groups to a group.
       operationId: group_id_members_put
@@ -2103,44 +2085,6 @@ paths:
           $ref: '#/components/responses/404'
         default:
           description: Unexpected error.
-  /tickets:
-    parameters:
-      - $ref: '#/components/parameters/query'
-      - name: simple
-        in: query
-        description: Whether to use simple search syntax in query.
-        schema:
-          $ref: '#/components/schemas/perlBoolean'
-      - name: search
-        in: query
-        description: Saved search id or description
-        schema:
-          type: string
-    get:
-      description: Search for tickets
-      operationId: tickets_get
-      tags:
-        - Ticket
-      responses:
-        "200":
-          description: No errors
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/paginated'
-                  - type: object
-                    properties:
-                      items:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/ticketReference'
-        "400":
-          $ref: '#/components/responses/400'
-        "401":
-          $ref: '#/components/responses/401'
-        default:
-          description: Unexpected error.
   /ticket:
     post:
       description: Create a new ticket.
@@ -2360,34 +2304,6 @@ paths:
           $ref: '#/components/responses/404'
         "500":
           $ref: '#/components/responses/doubleDeletion'
-        default:
-          description: Unexpected error.
-  /customfields:
-    post:
-      description: Search for custom fields.
-      tags:
-        - Custom Field
-      operationId: customfields_post
-      requestBody:
-        $ref: '#/components/requestBodies/jsonSearch'
-      responses:
-        "200":
-          description: No errors
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/paginated'
-                  - type: object
-                    properties:
-                      items:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/customFieldReference'
-        "400":
-          $ref: '#/components/responses/400'
-        "401":
-          $ref: '#/components/responses/401'
         default:
           description: Unexpected error.
   /customfield/{id}:
@@ -2651,7 +2567,7 @@ paths:
           description: Unexpected error.
   /catalog/{idOrName}:
     parameters:
-      - $ref: '#/components/parameters/idOrName'
+      - $ref: '#/components/parameters/catalogIdOrName'
     get:
       description: Get information about a catalog.
       operationId: catalog_id_name_get
@@ -2842,34 +2758,6 @@ paths:
           $ref: '#/components/responses/doubleDeletion'
         default:
           description: Unexpected error.
-  /assets:
-    get:
-      description: Search assets with AssetSQL.
-      operationId: assets_get
-      tags:
-        - Asset
-      parameters:
-        - $ref: '#/components/parameters/query'
-      responses:
-        "200":
-          description: Assets queried successfully.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/paginated'
-                  - type: object
-                    properties:
-                      items:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/assetReference'
-        "400":
-          $ref: '#/components/responses/400'
-        "401":
-          $ref: '#/components/responses/401'
-        default:
-          description: Unexpected error.
   /asset:
     post:
       description: Create a new asset.
@@ -2984,34 +2872,6 @@ paths:
                   type: string
         "404":
           $ref: '#/components/responses/404'
-        default:
-          description: Unexpected error.
-  /articles:
-    post:
-      description: Search articles with a JSON search.
-      operationId: articles_get
-      tags:
-        - Article
-      requestBody:
-        $ref: '#/components/requestBodies/jsonSearch'
-      responses:
-        "200":
-          description: Articles queried successfully.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/paginated'
-                  - type: object
-                    properties:
-                      items:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/articleReference'
-        "400":
-          $ref: '#/components/responses/400'
-        "401":
-          $ref: '#/components/responses/401'
         default:
           description: Unexpected error.
   /article:
@@ -3139,58 +2999,6 @@ paths:
           $ref: '#/components/responses/404'
         "500":
           $ref: '#/components/responses/doubleDeletion'
-        default:
-          description: Unexpected error.
-  /customroles:
-    post:
-      description: Search custom roles with a JSON search.
-      operationId: customroles_get
-      tags:
-        - Custom Role
-      requestBody:
-        $ref: '#/components/requestBodies/jsonSearch'
-      responses:
-        "200":
-          description: Custom roles queried successfully.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/paginated'
-                  - type: object
-                    properties:
-                      items:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/genericObject'
-        "400":
-          $ref: '#/components/responses/400'
-        "401":
-          $ref: '#/components/responses/401'
-        default:
-          description: Unexpected error.
-  /customrole/{id}:
-    parameters:
-      - $ref: '#/components/parameters/id'
-    get:
-      description: Get information about a custom role. RT offers no way to
-        create or modify one through this API; the web UI is the only way.
-      operationId: customrole_id_get
-      tags:
-        - Custom Role
-      responses:
-        "200":
-          description: Custom role queried successfully.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/objectMetadata'
-                  - $ref: '#/components/schemas/customRolePropertiesCommon'
-        "401":
-          $ref: '#/components/responses/401'
-        "404":
-          $ref: '#/components/responses/404'
         default:
           description: Unexpected error.
   /lifecycles:
@@ -3693,6 +3501,9 @@ paths:
         in: path
         required: true
         description: The id of the custom field value.
+        # The first value of the first custom field, which is what a read has
+        # to aim at when it wants one of these.
+        example: 1
         schema:
           type: integer
           minimum: 1
@@ -3788,6 +3599,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightGrant'
+            example:
+              Right: SeeQueue
+              Group: Everyone
       responses:
         "201":
           description: Right granted successfully.
@@ -3878,6 +3692,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightsBulk'
+            example:
+              grant:
+                - Right: SeeQueue
+                  Group: Everyone
       responses:
         "200":
           description: The changes were applied. Read the body to find out what
@@ -3885,9 +3703,19 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                # What was done, per grant and per revoke -- not a list of
+                # messages. Each entry carries its own status, so a bulk that
+                # half worked says which half.
+                type: object
+                properties:
+                  granted:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
+                  revoked:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -3964,7 +3792,7 @@ paths:
           description: Unexpected error.
   /group/{id}/rights:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/groupRecordId'
     get:
       description: List the rights granted on this group, one entry per
         principal and right.
@@ -3995,6 +3823,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightGrant'
+            example:
+              Right: SeeGroup
+              Group: Everyone
       responses:
         "201":
           description: Right granted successfully.
@@ -4042,7 +3873,7 @@ paths:
           description: Unexpected error.
   /group/{id}/rights/available:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/groupRecordId'
     get:
       description: The rights that CAN be granted on this group, which is
         what makes a grant's Right field checkable before it is sent.
@@ -4072,7 +3903,7 @@ paths:
           description: Unexpected error.
   /group/{id}/rights/bulk:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/groupRecordId'
     post:
       description: Grant and revoke several rights on this group in one
         request.
@@ -4085,6 +3916,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightsBulk'
+            example:
+              grant:
+                - Right: SeeGroup
+                  Group: Everyone
       responses:
         "200":
           description: The changes were applied. Read the body to find out what
@@ -4092,9 +3927,19 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                # What was done, per grant and per revoke -- not a list of
+                # messages. Each entry carries its own status, so a bulk that
+                # half worked says which half.
+                type: object
+                properties:
+                  granted:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
+                  revoked:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4105,7 +3950,7 @@ paths:
           description: Unexpected error.
   /group/{id}/rights/{right}/group/{principalId}:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/groupRecordId'
       - name: right
         in: path
         required: true
@@ -4138,7 +3983,7 @@ paths:
           description: Unexpected error.
   /group/{id}/rights/{right}/user/{principalId}:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/groupRecordId'
       - name: right
         in: path
         required: true
@@ -4202,6 +4047,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightGrant'
+            example:
+              Right: ShowArticle
+              Group: Everyone
       responses:
         "201":
           description: Right granted successfully.
@@ -4292,6 +4140,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightsBulk'
+            example:
+              grant:
+                - Right: ShowArticle
+                  Group: Everyone
       responses:
         "200":
           description: The changes were applied. Read the body to find out what
@@ -4299,9 +4151,19 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                # What was done, per grant and per revoke -- not a list of
+                # messages. Each entry carries its own status, so a bulk that
+                # half worked says which half.
+                type: object
+                properties:
+                  granted:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
+                  revoked:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4378,7 +4240,7 @@ paths:
           description: Unexpected error.
   /catalog/{idOrName}/rights:
     parameters:
-      - $ref: '#/components/parameters/idOrName'
+      - $ref: '#/components/parameters/catalogIdOrName'
     get:
       description: List the rights granted on this catalog, one entry per
         principal and right.
@@ -4409,6 +4271,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightGrant'
+            example:
+              Right: ShowCatalog
+              Group: Everyone
       responses:
         "201":
           description: Right granted successfully.
@@ -4456,7 +4321,7 @@ paths:
           description: Unexpected error.
   /catalog/{idOrName}/rights/available:
     parameters:
-      - $ref: '#/components/parameters/idOrName'
+      - $ref: '#/components/parameters/catalogIdOrName'
     get:
       description: The rights that CAN be granted on this catalog, which is
         what makes a grant's Right field checkable before it is sent.
@@ -4486,7 +4351,7 @@ paths:
           description: Unexpected error.
   /catalog/{idOrName}/rights/bulk:
     parameters:
-      - $ref: '#/components/parameters/idOrName'
+      - $ref: '#/components/parameters/catalogIdOrName'
     post:
       description: Grant and revoke several rights on this catalog in one
         request.
@@ -4499,6 +4364,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightsBulk'
+            example:
+              grant:
+                - Right: ShowCatalog
+                  Group: Everyone
       responses:
         "200":
           description: The changes were applied. Read the body to find out what
@@ -4506,9 +4375,19 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                # What was done, per grant and per revoke -- not a list of
+                # messages. Each entry carries its own status, so a bulk that
+                # half worked says which half.
+                type: object
+                properties:
+                  granted:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
+                  revoked:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4519,7 +4398,7 @@ paths:
           description: Unexpected error.
   /catalog/{idOrName}/rights/{right}/group/{principalId}:
     parameters:
-      - $ref: '#/components/parameters/idOrName'
+      - $ref: '#/components/parameters/catalogIdOrName'
       - name: right
         in: path
         required: true
@@ -4552,7 +4431,7 @@ paths:
           description: Unexpected error.
   /catalog/{idOrName}/rights/{right}/user/{principalId}:
     parameters:
-      - $ref: '#/components/parameters/idOrName'
+      - $ref: '#/components/parameters/catalogIdOrName'
       - name: right
         in: path
         required: true
@@ -4616,6 +4495,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightGrant'
+            example:
+              Right: SeeCustomField
+              Group: Everyone
       responses:
         "201":
           description: Right granted successfully.
@@ -4706,6 +4588,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightsBulk'
+            example:
+              grant:
+                - Right: SeeCustomField
+                  Group: Everyone
       responses:
         "200":
           description: The changes were applied. Read the body to find out what
@@ -4713,9 +4599,19 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                # What was done, per grant and per revoke -- not a list of
+                # messages. Each entry carries its own status, so a bulk that
+                # half worked says which half.
+                type: object
+                properties:
+                  granted:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
+                  revoked:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4821,6 +4717,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightGrant'
+            example:
+              Right: ShowConfigTab
+              Group: Everyone
       responses:
         "201":
           description: Right granted successfully.
@@ -4905,6 +4804,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/rightsBulk'
+            example:
+              grant:
+                - Right: ShowConfigTab
+                  Group: Everyone
       responses:
         "200":
           description: The changes were applied. Read the body to find out what
@@ -4912,9 +4815,19 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                # What was done, per grant and per revoke -- not a list of
+                # messages. Each entry carries its own status, so a bulk that
+                # half worked says which half.
+                type: object
+                properties:
+                  granted:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
+                  revoked:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/rightsBulkOutcome'
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4989,7 +4902,7 @@ paths:
           description: Unexpected error.
   /group/{id}/member/{principalId}:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/groupRecordId'
       - name: principalId
         in: path
         required: true
@@ -5013,7 +4926,7 @@ paths:
           description: Unexpected error.
   /user/{idOrName}/group/{groupId}:
     parameters:
-      - $ref: '#/components/parameters/idOrName'
+      - $ref: '#/components/parameters/userIdOrName'
       - name: groupId
         in: path
         required: true
