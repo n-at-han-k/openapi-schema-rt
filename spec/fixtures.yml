@@ -83,7 +83,15 @@ bodies:
     defaults: { on_create: new }
     transitions: { "": [new], new: [open], open: [resolved], resolved: [] }
   "PUT /lifecycle/{name}/maps": {}
-  "POST /lifecycle/{name}/validate": { type: ticket, initial: [new], active: [open], inactive: [resolved] }
+  # A COMPLETE configuration: RT answers 500 to a partial one rather than
+  # telling you it is invalid.
+  "POST /lifecycle/{name}/validate":
+    type: ticket
+    initial: [new]
+    active: [open]
+    inactive: [resolved]
+    defaults: { on_create: new }
+    transitions: { "": [new], new: [open], open: [resolved], resolved: [] }
 
   # Rights are granted to a scratch GROUP, so nothing real gains or loses one.
   "POST /queue/{idOrName}/rights": { Right: SeeQueue, Group: "%{group}" }

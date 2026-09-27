@@ -10,13 +10,6 @@
 require 'spec_helper'
 
 RSpec.describe 'AssetApi' do
-  describe 'DELETE /asset/{id}' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(example: self, method: 'DELETE', path: '/asset/{id}',
-                operation_id: 'asset_id_delete')
-    end
-  end
-
   describe 'GET /asset/{id}' do
     it 'answers a documented status, with a body matching the schema' do
       RT.verify(example: self, method: 'GET', path: '/asset/{id}',

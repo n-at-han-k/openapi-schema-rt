@@ -2933,7 +2933,9 @@ paths:
         default:
           description: Unexpected error.
     put:
-      description: Update an asset.
+      description: Update an asset. This is ALSO how an asset is deleted, by
+        setting Status to "deleted" -- there is no DELETE for an asset, and RT
+        answers 500 to one.
       operationId: asset_id_put
       tags:
         - Asset
@@ -2957,22 +2959,6 @@ paths:
                   type: string
         "404":
           $ref: '#/components/responses/404'
-        default:
-          description: Unexpected error.
-    delete:
-      description: Delete an asset, which sets its status to deleted.
-      operationId: asset_id_delete
-      tags:
-        - Asset
-      responses:
-        "204":
-          $ref: '#/components/responses/204'
-        "401":
-          $ref: '#/components/responses/401'
-        "404":
-          $ref: '#/components/responses/404'
-        "500":
-          $ref: '#/components/responses/doubleDeletion'
         default:
           description: Unexpected error.
   /articles:
@@ -3380,7 +3366,9 @@ paths:
       - $ref: '#/components/parameters/name'
     post:
       description: Check a lifecycle configuration without saving it. Answers
-        200 whether or not the configuration is valid -- read the body.
+        200 whether or not the configuration is valid -- read the body. The
+        configuration must be COMPLETE, transitions included; RT answers 500
+        rather than a validation failure to a partial one.
       operationId: lifecycle_name_validate_post
       tags:
         - Lifecycle
@@ -3400,7 +3388,7 @@ paths:
                 properties:
                   valid:
                     type: boolean
-                  errors:
+                  warnings:
                     type: array
                     items:
                       type: string
@@ -3591,6 +3579,26 @@ paths:
                         $ref: '#/components/schemas/principalReference'
                       User:
                         $ref: '#/components/schemas/principalReference'
+          links:
+            # How a grant is TAKEN BACK. Spelled out because the revoke path
+            # is not this one with an id on the end -- it carries the right
+            # and the principal -- so nothing can derive it from the grant.
+            # Which of the two applies is whichever of Group and User the
+            # grant named.
+            revokeFromGroup:
+              description: Take this right back from the group it was granted to.
+              operationId: queue_id_name_rights_right_group_delete
+              parameters:
+                idOrName: $request.path.idOrName
+                right: $request.body#/Right
+                principalId: $request.body#/Group
+            revokeFromUser:
+              description: Take this right back from the user it was granted to.
+              operationId: queue_id_name_rights_right_user_delete
+              parameters:
+                idOrName: $request.path.idOrName
+                right: $request.body#/Right
+                principalId: $request.body#/User
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -3675,9 +3683,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the group losing the right.
+        description: The ID of the group losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this queue from one group.
       operationId: queue_id_name_rights_right_group_delete
@@ -3705,9 +3716,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the user losing the right.
+        description: The ID of the user losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this queue from one user.
       operationId: queue_id_name_rights_right_user_delete
@@ -3772,6 +3786,26 @@ paths:
                         $ref: '#/components/schemas/principalReference'
                       User:
                         $ref: '#/components/schemas/principalReference'
+          links:
+            # How a grant is TAKEN BACK. Spelled out because the revoke path
+            # is not this one with an id on the end -- it carries the right
+            # and the principal -- so nothing can derive it from the grant.
+            # Which of the two applies is whichever of Group and User the
+            # grant named.
+            revokeFromGroup:
+              description: Take this right back from the group it was granted to.
+              operationId: group_id_rights_right_group_delete
+              parameters:
+                id: $request.path.id
+                right: $request.body#/Right
+                principalId: $request.body#/Group
+            revokeFromUser:
+              description: Take this right back from the user it was granted to.
+              operationId: group_id_rights_right_user_delete
+              parameters:
+                id: $request.path.id
+                right: $request.body#/Right
+                principalId: $request.body#/User
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -3856,9 +3890,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the group losing the right.
+        description: The ID of the group losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this group from one group.
       operationId: group_id_rights_right_group_delete
@@ -3886,9 +3923,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the user losing the right.
+        description: The ID of the user losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this group from one user.
       operationId: group_id_rights_right_user_delete
@@ -3953,6 +3993,26 @@ paths:
                         $ref: '#/components/schemas/principalReference'
                       User:
                         $ref: '#/components/schemas/principalReference'
+          links:
+            # How a grant is TAKEN BACK. Spelled out because the revoke path
+            # is not this one with an id on the end -- it carries the right
+            # and the principal -- so nothing can derive it from the grant.
+            # Which of the two applies is whichever of Group and User the
+            # grant named.
+            revokeFromGroup:
+              description: Take this right back from the group it was granted to.
+              operationId: class_id_name_rights_right_group_delete
+              parameters:
+                idOrName: $request.path.idOrName
+                right: $request.body#/Right
+                principalId: $request.body#/Group
+            revokeFromUser:
+              description: Take this right back from the user it was granted to.
+              operationId: class_id_name_rights_right_user_delete
+              parameters:
+                idOrName: $request.path.idOrName
+                right: $request.body#/Right
+                principalId: $request.body#/User
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4037,9 +4097,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the group losing the right.
+        description: The ID of the group losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this class from one group.
       operationId: class_id_name_rights_right_group_delete
@@ -4067,9 +4130,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the user losing the right.
+        description: The ID of the user losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this class from one user.
       operationId: class_id_name_rights_right_user_delete
@@ -4134,6 +4200,26 @@ paths:
                         $ref: '#/components/schemas/principalReference'
                       User:
                         $ref: '#/components/schemas/principalReference'
+          links:
+            # How a grant is TAKEN BACK. Spelled out because the revoke path
+            # is not this one with an id on the end -- it carries the right
+            # and the principal -- so nothing can derive it from the grant.
+            # Which of the two applies is whichever of Group and User the
+            # grant named.
+            revokeFromGroup:
+              description: Take this right back from the group it was granted to.
+              operationId: catalog_id_name_rights_right_group_delete
+              parameters:
+                idOrName: $request.path.idOrName
+                right: $request.body#/Right
+                principalId: $request.body#/Group
+            revokeFromUser:
+              description: Take this right back from the user it was granted to.
+              operationId: catalog_id_name_rights_right_user_delete
+              parameters:
+                idOrName: $request.path.idOrName
+                right: $request.body#/Right
+                principalId: $request.body#/User
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4218,9 +4304,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the group losing the right.
+        description: The ID of the group losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this catalog from one group.
       operationId: catalog_id_name_rights_right_group_delete
@@ -4248,9 +4337,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the user losing the right.
+        description: The ID of the user losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this catalog from one user.
       operationId: catalog_id_name_rights_right_user_delete
@@ -4315,6 +4407,26 @@ paths:
                         $ref: '#/components/schemas/principalReference'
                       User:
                         $ref: '#/components/schemas/principalReference'
+          links:
+            # How a grant is TAKEN BACK. Spelled out because the revoke path
+            # is not this one with an id on the end -- it carries the right
+            # and the principal -- so nothing can derive it from the grant.
+            # Which of the two applies is whichever of Group and User the
+            # grant named.
+            revokeFromGroup:
+              description: Take this right back from the group it was granted to.
+              operationId: customfield_id_rights_right_group_delete
+              parameters:
+                id: $request.path.id
+                right: $request.body#/Right
+                principalId: $request.body#/Group
+            revokeFromUser:
+              description: Take this right back from the user it was granted to.
+              operationId: customfield_id_rights_right_user_delete
+              parameters:
+                id: $request.path.id
+                right: $request.body#/Right
+                principalId: $request.body#/User
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4399,9 +4511,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the group losing the right.
+        description: The ID of the group losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this custom field from one group.
       operationId: customfield_id_rights_right_group_delete
@@ -4429,9 +4544,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the user losing the right.
+        description: The ID of the user losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this custom field from one user.
       operationId: customfield_id_rights_right_user_delete
@@ -4494,6 +4612,24 @@ paths:
                         $ref: '#/components/schemas/principalReference'
                       User:
                         $ref: '#/components/schemas/principalReference'
+          links:
+            # How a grant is TAKEN BACK. Spelled out because the revoke path
+            # is not this one with an id on the end -- it carries the right
+            # and the principal -- so nothing can derive it from the grant.
+            # Which of the two applies is whichever of Group and User the
+            # grant named.
+            revokeFromGroup:
+              description: Take this right back from the group it was granted to.
+              operationId: global_rights_right_group_delete
+              parameters:
+                right: $request.body#/Right
+                principalId: $request.body#/Group
+            revokeFromUser:
+              description: Take this right back from the user it was granted to.
+              operationId: global_rights_right_user_delete
+              parameters:
+                right: $request.body#/Right
+                principalId: $request.body#/User
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -4573,9 +4709,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the group losing the right.
+        description: The ID of the group losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this global from one group.
       operationId: global_rights_right_group_delete
@@ -4602,9 +4741,12 @@ paths:
       - name: principalId
         in: path
         required: true
-        description: Name or id of the user losing the right.
+        description: The ID of the user losing the right. NOT a name --
+          RT answers 500 to a name here, unlike everywhere else it accepts
+          either.
         schema:
-          type: string
+          type: integer
+          minimum: 1
     delete:
       description: Revoke one right on this global from one user.
       operationId: global_rights_right_user_delete

@@ -68,12 +68,32 @@ module RT
 
     begin
       target = changing ? fill_scratch(path, method) : fill(path, fixture)
-      fixture = fixture.merge('body' => body_for(path, method)) if changing && needs_body?(operation)
+
+      # An operation with a requestBody needs one whether or not it changes
+      # anything: `POST /lifecycle/{name}/validate` answers 200, so it is a
+      # read by the rule above, and RT answers 500 to it with no body. The
+      # `paths` fixture wins where there is one -- that is where the searches
+      # keep theirs -- and `bodies` is the fallback.
+      fixture = fixture.merge('body' => body_for(path, method)) if needs_body?(operation) && !fixture.key?('body')
     rescue MissingFixture => e
       return example.skip(e.message)
     end
 
+    prepare(path, target) if changing
+
+    warn("[debug] #{method} #{BASE}#{target} body=#{fixture['body'].inspect[0, 160]}") if ENV['RT_DEBUG']
+
     response = call(method, target, fixture)
+
+    # A 5xx is never conforming, whatever the document says. Upstream
+    # describes `500` on some deletes (RT answers one when you delete the
+    # same thing twice), and while that is true of RT it also means any
+    # Internal Server Error passes -- which is how `DELETE /asset/{id}`, an
+    # endpoint that does not work at all, sat in this document being tested
+    # and reported as fine.
+    if response.status.start_with?('5')
+      raise "#{method} #{path} answered #{response.status}: #{response.raw[0, 200]}"
+    end
 
     declared = operation.fetch('responses').keys.map(&:to_s)
     unless declared.include?(response.status) || declared.include?('default')
@@ -124,8 +144,11 @@ module RT
     path.gsub(/\{(\w+)\}/) do
       case Regexp.last_match(1)
       when 'valueId'     then Scratch.fetch_value
-      when 'principalId' then Scratch.fetch('group')
       when 'groupId'     then Scratch.fetch('group')
+      when 'principalId'
+        # `.../rights/{right}/user/{principalId}` wants a USER. Handing it a
+        # group id answers 500, which looks like a broken endpoint and is not.
+        path.include?('/user/{principalId}') ? Scratch.fetch('user') : Scratch.fetch('group')
       when 'right'       then 'SeeQueue'
       else
         unless Scratch::RECIPES.key?(subject)
@@ -135,6 +158,19 @@ module RT
         Scratch.fetch(subject)
       end
     end
+  end
+
+  # A precondition the endpoint needs but the document cannot state: revoking
+  # a right that was never granted answers 500, so the grant is made first.
+  # Without this the revoke examples test RT's error handling instead of the
+  # operation.
+  def prepare(path, target)
+    match = target.match(%r{\A(?<parent>.+)/rights/(?<right>[^/]+)/(?<kind>group|user)/(?<principal>[^/]+)\z})
+    return if match.nil?
+
+    call('POST', "#{match[:parent]}/rights",
+         { 'body' => { 'Right' => match[:right],
+                       match[:kind].capitalize => match[:principal] } })
   end
 
   def needs_body?(operation)
