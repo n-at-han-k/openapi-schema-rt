@@ -1,0 +1,134 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+#
+# Does this document describe the endpoints RT actually has?
+#
+# The RSpec suite checks what an endpoint ANSWERS, which can only ever test
+# the ones written down here. This checks the other direction, against RT's
+# own dispatch rules: an endpoint nobody documented is invisible to the suite
+# and to every client generated from this file.
+#
+#   RT_SOURCE=~/reference/rt-6.0.3 bin/check-routes
+#   RT_SOURCE=path/to/rt/lib/RT/REST2 bin/check-routes
+#
+# RT_SOURCE is a directory containing REST2's Resource/*.pm -- an RT checkout,
+# github.com/bestpractical/rt-extension-rest2, or the lib/RT/REST2 copied out
+# of a running instance, which is the one that matches what you are testing.
+#
+# Paths are compared by SHAPE: every parameter becomes {}, because the
+# document's names for them are its own business and RT's regexes have none.
+
+require 'set'
+require 'yaml'
+
+require 'dotenv'
+
+Dotenv.load(File.expand_path('../.env', __dir__))
+
+SOURCE = ENV['RT_SOURCE'] or abort('RT_SOURCE is not set: point it at a tree containing REST2/Resource/*.pm')
+DOC = File.expand_path('../request_tracker_rest2.yaml', __dir__)
+
+modules = Dir.glob(File.join(SOURCE, '**', 'Resource', '**', '*.pm'))
+abort("no Resource/*.pm under #{SOURCE}") if modules.empty?
+
+# Every capture group is a parameter; everything else is literal. `(a|b|c)` is
+# an alternation of LITERALS, so it expands into one path each -- that is how
+# RT spells /users/privileged and /ticket/{id}/comment.
+def shapes(regex)
+  # An OPTIONAL group means two paths, one with it and one without:
+  # `^/users(?:/(privileged|unprivileged)?)?$` serves /users as well as
+  # /users/privileged.
+  if (optional = regex.match(/\(\?:((?:[^()]|\([^()]*\))*)\)\?/))
+    return (shapes(regex.sub(optional[0], '')) +
+            shapes(regex.sub(optional[0], optional[1]))).uniq
+  end
+
+  body = regex.sub(/\A\^/, '').sub(%r{/\?\$\z}, '').sub(/\$\z/, '').sub(%r{/\?\z}, '')
+
+  paths = ['']
+  body.scan(%r{\(\?:[^)]*\)|\([^)]*\)|[^()]+}) do |token|
+    alternatives =
+      case token
+      when /\A\(\?:(.*)\)\z/, /\A\((.*)\)\z/
+        inner = Regexp.last_match(1)
+        if inner.match?(/\A[\w|\/]*\z/) && inner.include?('|')
+          inner.split('|', -1)                       # literal alternation
+        elsif inner.match?(/\A[\w\/]*\z/)
+          [inner]                                    # literal group
+        else
+          ['{}']                                     # a parameter
+        end
+      else
+        [token]
+      end
+
+    paths = paths.flat_map { |prefix| alternatives.map { |a| prefix + a } }
+  end
+
+  # `^/rt?$` means /r or /rt -- an optional literal character, not a
+  # parameter. The longer spelling is the one RT documents.
+  paths.map { |p| p.gsub(/(\w)\?/, '\\1') }
+       .map { |p| p.sub(%r{/\z}, '') }.map { |p| p.empty? ? '/' : p }.uniq
+end
+
+from_source = Set.new
+
+modules.each do |file|
+  text = File.read(file)
+
+  # Rights.pm builds one set of routes per object type, so `$path` is a
+  # variable and has to be expanded rather than read:
+  #
+  #   $make_rules->( 'queue', 'Queue', 1 ),
+  #
+  # Without this, every rights path but /global/rights looks like fiction.
+  objects = text.scan(/\$\w+->\(\s*'(\w+)'/).flatten
+  objects += text.scan(/path\s*=>\s*'([^']+)'/).flatten
+  objects.uniq!
+
+  text.scan(/qr\{(.+?)\}/) do
+    regex = Regexp.last_match(1)
+
+    if regex.include?('$path')
+      objects.each { |object| shapes(regex.gsub('$path', object)).each { |s| from_source << s } }
+    else
+      shapes(regex).each { |s| from_source << s }
+    end
+  end
+end
+
+documented = YAML.safe_load_file(DOC, aliases: true, permitted_classes: [Date, Time])
+              .fetch('paths').keys
+              .map { |p| p.gsub(/\{[^}]*\}/, '{}').sub(%r{/\z}, '') }
+              .to_set
+
+# RT's dispatcher offers /queue/(\d+) and /queue/([^/]+) as separate rules for
+# the same documented /queue/{idOrName}, so they collapse to one shape anyway.
+missing = (from_source - documented).sort
+fiction = (documented - from_source).sort
+
+puts "#{from_source.size} route shapes in #{SOURCE}"
+puts "#{documented.size} in the document"
+puts
+
+unless missing.empty?
+  puts "NOT DOCUMENTED (#{missing.size}) -- RT serves these and this document does not mention them:"
+  missing.each { |p| puts "  #{p}" }
+  puts
+end
+
+unless fiction.empty?
+  puts "NOT IN RT (#{fiction.size}) -- documented here with no dispatch rule behind it:"
+  fiction.each { |p| puts "  #{p}" }
+  puts
+end
+
+if missing.empty? && fiction.empty?
+  puts 'every route RT serves is described, and nothing is described that it does not serve'
+  exit 0
+end
+
+# Undocumented routes are a gap to close, not a failure of the document as it
+# stands; fiction is a failure, because a client generated from it calls
+# something that is not there.
+exit(fiction.empty? ? 0 : 1)

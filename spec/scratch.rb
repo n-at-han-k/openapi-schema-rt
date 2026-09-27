@@ -65,6 +65,14 @@ module RT
       @made.delete(type)
     end
 
+    # The runner knows only the values it was handed, not which kind they
+    # were, so a successful delete is matched back by value.
+    def forget_by_value(values)
+      wanted = values.map(&:to_s)
+
+      @made.delete_if { |_, made| wanted.include?(made.to_s) }
+    end
+
     def create(type)
       recipe = RECIPES.fetch(type) { raise("no scratch recipe for #{type}") }
       response = RT.call('POST', recipe[:path], { 'body' => recipe[:body].call })

@@ -10,21 +10,25 @@
 
 require 'spec_helper'
 
-RSpec.describe 'MiscellaneousApi' do
-  describe 'GET /rt' do
+RSpec.describe '{{classname}}' do
+{{#operations}}
+{{#operation}}
+  describe '{{httpMethod}} {{path}}' do
     it 'answers a documented status, with a body matching the schema' do
       RT.verify(
         example:      self,
-        method:       'GET',
-        path:         '/rt',
-        operation_id: 'rt_get',
-        mutating:     false,
-        params:       {},
-        query:        nil,
-        body:         nil,
-        setup:        nil
+        method:       '{{httpMethod}}',
+        path:         '{{path}}',
+        operation_id: '{{operationId}}',
+        mutating:     {{vendorExtensions.x-mutating}},
+        params:       {{{vendorExtensions.x-params}}},
+        query:        {{{vendorExtensions.x-query}}},
+        body:         {{{vendorExtensions.x-body}}},
+        setup:        {{{vendorExtensions.x-setup}}}
       )
     end
   end
 
+{{/operation}}
+{{/operations}}
 end

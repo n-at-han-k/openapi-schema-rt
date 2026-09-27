@@ -1,23 +1,21 @@
 #!/usr/bin/env bash
 # One RSpec example per operation this document describes.
 #
-# The stock Ruby generator already groups operations by tag, which is the
-# grouping the specs want, so nothing here is a custom generator -- only its
-# test template is replaced. Everything else it would emit (a client, models,
-# its own scaffolding) is switched off: the specs talk to RT with net/http and
-# validate against the document itself.
+# `-g rt-rspec` is a custom generator (generators/rspec) that decides, per
+# operation and from the document alone, which object to aim it at and what
+# body to send. Nothing per-endpoint is written by hand: spec_helper.rb knows
+# only how to make a request, check the status and validate the body.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 rm -rf spec/api
 
-openapi-generator-cli generate \
+openapi-generator-rt-rspec generate \
   -i request_tracker_rest2.yaml \
-  -g ruby \
-  -t templates/rspec \
+  -g rt-rspec \
   -o . \
-  --global-property apis,apiTests=true,models=false,modelTests=false,modelDocs=false,apiDocs=false,supportingFiles=false \
+  --global-property apis,apiTests=true,models=false,modelTests=false,supportingFiles=false \
   --additional-properties=gemName=rt,moduleName=RT
 
 # api tests can only be reached through the api pass, so the client is

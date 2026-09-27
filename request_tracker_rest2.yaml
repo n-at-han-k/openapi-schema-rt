@@ -658,6 +658,25 @@ components:
             - id
             - type
     # Fields
+    customFieldApplication:
+      description: One place a custom field applies. ObjectId 0 with Global
+        true is the global application; anything else names the object.
+      type: object
+      properties:
+        ObjectId:
+          type: integer
+          minimum: 0
+        Global:
+          type: boolean
+        ObjectType:
+          type: string
+          example: RT::Queue
+        ObjectName:
+          type: string
+        _url:
+          $ref: '#/components/schemas/url'
+      required:
+        - ObjectId
     customFieldsApplied:
       type: array
       description: The custom fields applied to an object, as a queue lists the
@@ -3394,6 +3413,207 @@ paths:
                       type: string
         "401":
           $ref: '#/components/responses/401'
+        default:
+          description: Unexpected error.
+  /queue/{id}/customfields:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: The custom fields applied to one queue. An id only here --
+        this route does not take a name, unlike the queue itself.
+      operationId: queue_id_customfields_get
+      tags:
+        - Custom Field
+      responses:
+        "200":
+          description: Custom fields queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/customFieldReference'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /catalog/{id}/customfields:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: The custom fields applied to one catalog. An id only here --
+        this route does not take a name, unlike the catalog itself.
+      operationId: catalog_id_customfields_get
+      tags:
+        - Custom Field
+      responses:
+        "200":
+          description: Custom fields queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/customFieldReference'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /class/{id}/customfields:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: The custom fields applied to one class. An id only here --
+        this route does not take a name, unlike the class itself.
+      operationId: class_id_customfields_get
+      tags:
+        - Custom Field
+      responses:
+        "200":
+          description: Custom fields queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/customFieldReference'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/appliesto:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      description: What this custom field applies to. An entry with ObjectId 0
+        is the global application, which applies it to everything of its
+        lookup type.
+      operationId: customfield_id_appliesto_get
+      tags:
+        - Custom Field
+      responses:
+        "200":
+          description: Applications queried successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/paginated'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/customFieldApplication'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+    post:
+      description: Apply this custom field to an object -- a queue for a ticket
+        field, a catalog for an asset field, a class for an article field.
+        ObjectId 0 applies it globally.
+      operationId: customfield_id_appliesto_post
+      tags:
+        - Custom Field
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                ObjectId:
+                  description: The id of the object to apply it to, or 0 for
+                    every object of its lookup type.
+                  type: integer
+                  minimum: 0
+              required:
+                - ObjectId
+            example:
+              ObjectId: 1
+      responses:
+        "201":
+          description: Applied successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  ObjectId:
+                    type: integer
+                  ObjectType:
+                    type: string
+                  ObjectName:
+                    type: string
+          links:
+            unapply:
+              description: Stop applying the field to the object it was just
+                applied to. The path carries the object, so nothing can derive
+                it from this response alone.
+              operationId: customfield_id_appliesto_object_delete
+              parameters:
+                id: $request.path.id
+                objectId: $request.body#/ObjectId
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
+        default:
+          description: Unexpected error.
+  /customfield/{id}/appliesto/object/{objectId}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+      - name: objectId
+        in: path
+        required: true
+        description: The object to stop applying the field to, or 0 for the
+          global application.
+        schema:
+          type: integer
+          minimum: 0
+    delete:
+      description: Stop applying this custom field to one object.
+      operationId: customfield_id_appliesto_object_delete
+      tags:
+        - Custom Field
+      responses:
+        "204":
+          $ref: '#/components/responses/204'
+        "400":
+          $ref: '#/components/responses/400'
+        "401":
+          $ref: '#/components/responses/401'
+        "404":
+          $ref: '#/components/responses/404'
         default:
           description: Unexpected error.
   /customfield/{id}/values:

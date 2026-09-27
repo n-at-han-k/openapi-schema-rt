@@ -1,11 +1,16 @@
 # frozen_string_literal: true
 #
-# What "conforming" means. The generated files under spec/api say only WHICH
-# operations exist; everything here reads the document at runtime, so the
-# schema in request_tracker_rest2.yaml is the assertion and no expectation is
-# ever written twice.
+# What "conforming" means, and nothing about any particular endpoint.
 #
-# Point it at a real RT with a .env beside this repository's root:
+# The generated files under spec/api carry everything that differs per
+# operation -- which object to aim it at, what to send, what has to exist
+# first -- and the generator worked all of it out from the document
+# (generators/rspec/src/rtrspec/RspecCodegen.java). What is left here is the
+# part that is the same every time: make the request against a real RT, check
+# the status is one the document describes, and validate the body against the
+# schema in that same document. Nothing is asserted twice.
+#
+# Point it at an RT with a .env beside this repository's root:
 #
 #   RT_URL=https://rt.example.com
 #   RT_TOKEN=1-14-...
@@ -14,10 +19,10 @@
 # .env is gitignored; .env.example is the template. The environment still
 # wins, so a one-off run can override any of it.
 #
-# READ-ONLY by default. An operation that changes something -- a PUT, a
-# DELETE, or a POST the document says answers 201 -- is skipped unless
-# RT_MUTATE=1, because the obvious way to test a create is to leave one
-# behind on every run.
+# READ-ONLY by default. An operation that changes something is skipped unless
+# RT_MUTATE=1, and when it does run it is aimed at a SCRATCH object this suite
+# made -- never at anything that was in RT beforehand. bin/scrub-scratch takes
+# them all down afterwards.
 
 require 'json'
 require 'net/http'
@@ -27,8 +32,8 @@ require 'yaml'
 require 'dotenv'
 require 'json_schemer'
 
-# Loaded before anything reads ENV below. `overload: false` is the default
-# and the point: a variable already exported wins over the file.
+# Loaded before anything reads ENV below. The default is `overload: false`,
+# which is the point: a variable already exported wins over the file.
 Dotenv.load(File.expand_path('../.env', __dir__))
 
 require_relative 'scratch'
@@ -38,7 +43,6 @@ module RT
 
   DOC = YAML.safe_load_file(File.join(ROOT, 'request_tracker_rest2.yaml'),
                             aliases: true, permitted_classes: [Date, Time]).freeze
-  FIXTURES = YAML.safe_load_file(File.join(__dir__, 'fixtures.yml')).freeze
 
   SCHEMA = JSONSchemer.schema(DOC)
 
@@ -52,45 +56,32 @@ module RT
 
   module_function
 
-  # The one thing every generated example calls.
-  def verify(example:, method:, path:, operation_id:)
+  # The one thing every generated example calls. Everything it is given was
+  # decided by the generator from the document.
+  def verify(example:, method:, path:, operation_id:, mutating:, params:, query:, body:, setup: nil)
     return example.skip('RT_TOKEN is not set; nothing to talk to') if TOKEN.empty?
 
     operation = DOC.dig('paths', path, method.downcase)
     return example.skip("#{method} #{path} is not in the document") unless operation
 
-    if mutating?(method, operation) && !MUTATE
+    if mutating && !MUTATE
       return example.skip("#{method} changes state; set RT_MUTATE=1 to include it")
     end
 
-    fixture = FIXTURES.fetch('paths', {}).fetch(path, {}) || {}
-    changing = mutating?(method, operation)
+    missing = params.select { |_, value| value.nil? }.keys
+    return example.skip("nothing safe to aim #{method} #{path} at: #{missing.join(', ')}") if missing.any?
 
-    begin
-      target = changing ? fill_scratch(path, method) : fill(path, fixture)
+    target = path.gsub(/\{(\w+)\}/) { URI.encode_www_form_component(params.fetch(Regexp.last_match(1)).to_s) }
 
-      # An operation with a requestBody needs one whether or not it changes
-      # anything: `POST /lifecycle/{name}/validate` answers 200, so it is a
-      # read by the rule above, and RT answers 500 to it with no body. The
-      # `paths` fixture wins where there is one -- that is where the searches
-      # keep theirs -- and `bodies` is the fallback.
-      fixture = fixture.merge('body' => body_for(path, method)) if needs_body?(operation) && !fixture.key?('body')
-    rescue MissingFixture => e
-      return example.skip(e.message)
-    end
+    # What the document says has to happen first, if anything.
+    call(setup[:method], interpolate(setup[:path], params), body: grant_body(params)) if setup
 
-    prepare(path, target) if changing
+    response = call(method, target, body: body, query: query)
 
-    warn("[debug] #{method} #{BASE}#{target} body=#{fixture['body'].inspect[0, 160]}") if ENV['RT_DEBUG']
-
-    response = call(method, target, fixture)
-
-    # A 5xx is never conforming, whatever the document says. Upstream
-    # describes `500` on some deletes (RT answers one when you delete the
-    # same thing twice), and while that is true of RT it also means any
-    # Internal Server Error passes -- which is how `DELETE /asset/{id}`, an
-    # endpoint that does not work at all, sat in this document being tested
-    # and reported as fine.
+    # A 5xx is never conforming, whatever the document says about it. RT
+    # answers one to a delete it has already done, and describing that as a
+    # legitimate response means every Internal Server Error passes -- which is
+    # how an endpoint that does not work at all sat here being tested.
     if response.status.start_with?('5')
       raise "#{method} #{path} answered #{response.status}: #{response.raw[0, 200]}"
     end
@@ -101,11 +92,9 @@ module RT
             "describe (it describes #{declared.join(', ')}). Body: #{response.raw[0, 300]}"
     end
 
-    Scratch.forget(subject_of(path)) if changing && method == 'DELETE' && response.status.start_with?('2')
+    Scratch.forget_by_value(params.values) if mutating && method == 'DELETE' && response.status.start_with?('2')
 
     schema = operation.dig('responses', response.status, 'content', 'application/json', 'schema')
-    # A response the document describes without a body, or by $ref to a shared
-    # one, is checked for its status and nothing more.
     return if schema.nil? || response.body.nil?
 
     pointer = "#/paths/#{escape(path)}/#{method.downcase}/responses/#{response.status}" \
@@ -118,119 +107,33 @@ module RT
           "describe:\n" + errors.first(8).map { |e| report(e) }.join("\n")
   end
 
-  # A create, an update or a delete. A POST is only a create when the document
-  # says it answers 201 -- RT searches with POST too, and those are reads.
-  def mutating?(method, operation)
-    return true if %w[PUT PATCH DELETE].include?(method)
-
-    method == 'POST' && operation.fetch('responses', {}).key?('201')
+  # A setup request reuses the target's own parameters: the document links the
+  # two, so they address the same thing.
+  def interpolate(path, params)
+    path.gsub(/\{(\w+)\}/) { URI.encode_www_form_component(params.fetch(Regexp.last_match(1), '').to_s) }
   end
 
-  MissingFixture = Class.new(StandardError)
+  # The setup request's body, built from the parameters the link shares with
+  # the target. `right` and a principal is the only shape a link declares.
+  def grant_body(params)
+    return nil unless params.key?('right')
 
-  # Which kind of object a path is about, from its first literal segment.
-  # /queue/{idOrName}/rights/... is about a queue.
-  def subject_of(path)
-    segment = path.split('/').reject(&:empty?).first.to_s
-
-    Scratch::RECIPES.key?(segment) ? segment : segment.sub(/s\z/, '')
+    { 'Right' => params['right'],
+      params.key?('principalId') && params['principalId'] ? 'Group' : nil => params['principalId'] }
+      .compact
   end
 
-  # A mutating operation is aimed at something this run made. Nothing here
-  # ever touches an object that was in RT before the suite started.
-  def fill_scratch(path, method)
-    subject = subject_of(path)
-
-    path.gsub(/\{(\w+)\}/) do
-      case Regexp.last_match(1)
-      when 'valueId'     then Scratch.fetch_value
-      when 'groupId'     then Scratch.fetch('group')
-      when 'principalId'
-        # `.../rights/{right}/user/{principalId}` wants a USER. Handing it a
-        # group id answers 500, which looks like a broken endpoint and is not.
-        path.include?('/user/{principalId}') ? Scratch.fetch('user') : Scratch.fetch('group')
-      when 'right'       then 'SeeQueue'
-      else
-        unless Scratch::RECIPES.key?(subject)
-          raise(MissingFixture, "nothing safe to aim #{method} #{path} at: no scratch #{subject}")
-        end
-
-        Scratch.fetch(subject)
-      end
-    end
-  end
-
-  # A precondition the endpoint needs but the document cannot state: revoking
-  # a right that was never granted answers 500, so the grant is made first.
-  # Without this the revoke examples test RT's error handling instead of the
-  # operation.
-  def prepare(path, target)
-    match = target.match(%r{\A(?<parent>.+)/rights/(?<right>[^/]+)/(?<kind>group|user)/(?<principal>[^/]+)\z})
-    return if match.nil?
-
-    call('POST', "#{match[:parent]}/rights",
-         { 'body' => { 'Right' => match[:right],
-                       match[:kind].capitalize => match[:principal] } })
-  end
-
-  def needs_body?(operation)
-    operation.key?('requestBody')
-  end
-
-  # The smallest body the document says is acceptable, built from the schema's
-  # own required fields and examples rather than from a table of guesses.
-  def body_for(path, method)
-    fixture = FIXTURES.fetch('bodies', {})["#{method} #{path}"]
-    raise(MissingFixture, "no body fixture for #{method} #{path}") if fixture.nil?
-
-    resolve(fixture)
-  end
-
-  # %{queue} and friends are whatever spec/scratch.rb made for this run. A
-  # body cannot name a real object even by mistake, because nothing but these
-  # placeholders is substituted.
-  def resolve(node)
-    case node
-    when Hash  then node.transform_values { |value| resolve(value) }
-    when Array then node.map { |value| resolve(value) }
-    when String
-      node.gsub(/%\{(\w+)\}/) do
-        key = Regexp.last_match(1)
-        case key
-        when 'run'    then Scratch::RUN
-        when 'serial' then Scratch.serial
-        else Scratch.fetch(key)
-        end
-      end
-    else node
-    end
-  end
-
-  # Path parameters come from spec/fixtures.yml: this suite talks to a real
-  # RT, and only the person running it knows which ticket is safe to read.
-  def fill(path, fixture)
-    params = FIXTURES.fetch('params', {}).merge(fixture.fetch('params', {}) || {})
-
-    path.gsub(/\{(\w+)\}/) do
-      name = Regexp.last_match(1)
-      value = params[name]
-      raise(MissingFixture, "no fixture for {#{name}} in #{path}") if value.nil?
-
-      URI.encode_www_form_component(value.to_s)
-    end
-  end
-
-  def call(method, target, fixture = {})
+  def call(method, target, body: nil, query: nil)
     uri = URI.parse(BASE.to_s + target)
-    uri.query = fixture['query'] if fixture['query']
+    uri.query = query if query
 
     request = Net::HTTP.const_get(method.capitalize).new(uri)
     request['Authorization'] = "token #{TOKEN}"
     request['Accept'] = 'application/json'
 
-    if fixture.key?('body')
+    unless body.nil?
       request['Content-Type'] = 'application/json'
-      request.body = JSON.dump(fixture['body'])
+      request.body = JSON.dump(body)
     end
 
     raw = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') { |http|
@@ -260,17 +163,31 @@ module RT
   end
 end
 
+# What a generated spec calls for a parameter it must not aim at real data.
+# The kinds come from the generator; the making and the removing are here.
+def scratch(kind)
+  RT::Scratch.fetch(kind.to_s)
+end
+
+def scratch_value
+  RT::Scratch.fetch_value
+end
+
+def unique(prefix)
+  RT::Scratch.name(prefix)
+end
+
 RSpec.configure do |config|
   config.disable_monkey_patching!
+  config.formatter = :documentation if ENV['RT_TOKEN']
 
-  # Whatever the mutating half made, taken back down -- even if it failed,
-  # and including what the CREATE examples made, which Scratch never saw. By
-  # name rather than by a list of ids, because a run that dies halfway leaves
-  # no list.
+  # Whatever the mutating half made, taken back down -- even if it failed, and
+  # including what the create examples made, which nothing tracked. By name
+  # rather than by a list of ids, because a run that dies halfway leaves no
+  # list.
   config.after(:suite) do
     if ENV['RT_MUTATE'] == '1'
       system(File.expand_path('../bin/scrub-scratch', __dir__), '--force', out: File::NULL)
     end
   end
-  config.formatter = :documentation if ENV['RT_TOKEN']
 end
