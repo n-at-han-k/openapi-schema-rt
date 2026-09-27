@@ -629,13 +629,12 @@ components:
         - type: object
           properties:
             id:
-              # A NUMBER here, whatever it is elsewhere: `GET /queue/3` answers
-              # `"_hyperlinks":[{"id":3,...}]` unquoted, while the same object's
-              # `TicketCustomFields[].id` is the string "2". Declared as only a
-              # string, a strict client cannot parse a queue it just created.
-              anyOf:
-                - type: integer
-                - type: string
+              # An INTEGER, unquoted -- and the one place in _hyperlinks that
+              # is. A ticket's own array carries `{"ref":"self","id":1}` beside
+              # `{"ref":"customfield","id":"2"}`, so the two branches really do
+              # disagree and a client that flattens them needs a type that
+              # holds both.
+              type: integer
               example: 3
             type:
               $ref: '#/components/schemas/typeEnum'
