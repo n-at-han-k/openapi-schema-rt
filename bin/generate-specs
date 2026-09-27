@@ -18,10 +18,9 @@ openapi-generator-rt-rspec generate \
   --global-property apis,apiTests=true,models=false,modelTests=false,supportingFiles=false \
   --additional-properties=gemName=rt,moduleName=RT
 
-# api tests can only be reached through the api pass, so the client is
-# generated and thrown away -- the specs talk to RT with net/http, and a
-# generated client would be a second thing to be wrong about the API.
-rm -rf lib .openapi-generator
+# The generator's own bookkeeping. NOT lib/: that is lib/schemas.rb, which
+# builds openapi-ruby's components from the document and is not generated.
+rm -rf .openapi-generator
 
 echo
 echo "generated:"

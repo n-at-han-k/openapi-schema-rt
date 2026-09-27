@@ -1,0 +1,134 @@
+# A disposable RT to run the suite against.
+#
+# The mutating half writes -- creates queues, grants rights, deletes what it
+# made -- and while it only ever touches objects it created itself, there is no
+# reason to point it at an RT anyone depends on. This is an RT you can throw
+# away:
+#
+#   docker compose up -d
+#   docker compose logs -f rt-init      # until "Done" -- it builds the schema
+#   cp .env.example .env                # RT_URL=http://localhost:8091, root/password
+#   bin/test --mutate
+#   docker compose down -v              # and it never existed
+#
+# The same image the spec was reverse engineered against, so a mismatch the
+# suite finds here is RT's and not a packaging difference.
+
+name: openapi-schema-rt
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rt_user
+      POSTGRES_PASSWORD: rt_pass
+      POSTGRES_DB: rt6
+    # No volume: the point is that this is disposable. `down` takes the data
+    # with it, which is what makes a mutating run repeatable.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rt_user -d rt6"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # RT will not start against an empty database, and the schema is not in the
+  # image -- it is built by rt-setup-database, once.
+  rt-init:
+    image: firefart/requesttracker:6.0.3
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./compose/RT_SiteConfig.pm:/opt/rt/etc/RT_SiteConfig.pm:ro
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        cd /opt/rt
+        # schema,coredata,insert rather than `init`: init would create the
+        # database too, and postgres has already made it from POSTGRES_DB.
+        #
+        # coredata brings the root user, whose password is `password` until
+        # someone changes it. That is the credential the suite uses, and the
+        # reason this RT must not be reachable from anywhere else.
+        # One action at a time: --datafile is refused alongside several, and
+        # `insert` needs it -- without it rt-setup-database reads an unset
+        # variable as a path and reports it cannot open '/content'.
+        # etc/initialdata is what `init` would have used, and is what brings
+        # the General queue and root's password.
+        #
+        # `create` is not among them: postgres has already made the database
+        # from POSTGRES_DB.
+        output=""
+        for step in schema coredata; do
+          output="$$output$$(./sbin/rt-setup-database --action $$step \
+                    --dba rt_user --dba-password rt_pass 2>&1)"
+        done
+        output="$$output$$(./sbin/rt-setup-database --action insert \
+                  --datafile /opt/rt/etc/initialdata \
+                  --dba rt_user --dba-password rt_pass 2>&1)"
+        echo "$$output"
+
+        # Running it twice is not an error: the tables are there either way,
+        # which is all the `rt` service needs.
+        if echo "$$output" | grep -qiE 'already exists|Done|Everything went well'; then
+          echo "Done"
+          exit 0
+        fi
+
+        echo "rt-setup-database did not finish" >&2
+        exit 1
+
+  # One of each object, so the READ half has something to read. A fresh RT
+  # has a queue and nothing else, and `GET /ticket/1` against an empty
+  # instance tests only that RT can answer 404.
+  #
+  # Ids are not chosen: on an empty database the first of each kind is 1,
+  # which is what the document's parameter examples say.
+  rt-seed:
+    image: curlimages/curl:8.11.1
+    depends_on:
+      rt:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        api() {
+          method=$$1; path=$$2; body=$$3
+          curl -fsS -u root:password -X "$$method" \
+            -H 'Content-Type: application/json' \
+            $${body:+-d "$$body"} "http://rt:8080/REST/2.0$$path" >/dev/null
+        }
+
+        api POST /ticket '{"Queue":"General","Subject":"seed ticket"}'
+        # RT ships a catalog ("General assets") and a class ("General")
+        # already, so the asset and the article hang off those rather than
+        # off two more.
+        api POST /asset '{"Name":"seed-asset","Catalog":"General assets"}'
+        api POST /article '{"Name":"seed-article","Class":"General"}'
+        api POST /group '{"Name":"seed-group"}'
+        api POST /customfield \
+          '{"Name":"seed-cf","Type":"Select","MaxValues":"1","LookupType":"RT::Queue-RT::Ticket"}'
+        api POST /customfield/1/value '{"Name":"seed-value"}'
+        echo "seeded"
+
+  rt:
+    image: firefart/requesttracker:6.0.3
+    depends_on:
+      rt-init:
+        condition: service_completed_successfully
+    ports:
+      - "${RT_PORT:-8091}:8080"
+    volumes:
+      - ./compose/RT_SiteConfig.pm:/opt/rt/etc/RT_SiteConfig.pm:ro
+    # RT's own standalone server, which is enough to answer REST2 and needs no
+    # web server in front of it. The cluster runs caddy ahead of RT; nothing
+    # the suite does can tell the difference.
+    command: ["/opt/rt/sbin/rt-server", "--port", "8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -u root:password http://localhost:8080/REST/2.0/rt >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 40

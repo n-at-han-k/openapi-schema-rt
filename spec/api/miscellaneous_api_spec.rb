@@ -2,28 +2,32 @@
 #
 # GENERATED from request_tracker_rest2.yaml by bin/generate-specs. Do not edit.
 #
-# One example per operation the document describes, carrying what that
-# operation needs: which object to aim it at, and what to send. All of it is
-# decided by the generator from the document -- see
-# generators/rspec/src/rtrspec/RspecCodegen.java. spec_helper.rb knows nothing
-# about any particular endpoint.
+# openapi-ruby's DSL: each operation is DECLARED as the document describes it,
+# and run_test! makes the request against a real RT and validates what comes
+# back against that declaration. The declaration IS the document -- the schemas
+# are the document's own components -- so nothing here restates a schema and
+# nothing can drift from one.
+#
+# What each example needs (which object to aim it at, what to send, what has to
+# exist first) was worked out from the document by
+# generators/rspec/src/rtrspec/RspecCodegen.java. spec/openapi_helper.rb knows
+# nothing about any endpoint.
 
-require 'spec_helper'
+require "openapi_helper"
 
-RSpec.describe 'MiscellaneousApi' do
-  describe 'GET /rt' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'GET',
-        path:         '/rt',
-        operation_id: 'rt_get',
-        mutating:     false,
-        params:       {},
-        query:        nil,
-        body:         nil,
-        setup:        nil
-      )
+RSpec.describe "MiscellaneousApi", type: :openapi do
+  openapi_schema :request_tracker_rest2
+
+  path "/rt" do
+
+    get "GET /rt" do
+      operationId "rt_get"
+      tags "Miscellaneous"
+
+      response 200, "Success" do
+        schema RT.response_schema("/rt", "get", "200")
+        run_test!
+      end
     end
   end
 

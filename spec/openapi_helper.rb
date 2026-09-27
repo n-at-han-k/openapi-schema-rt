@@ -26,12 +26,61 @@ Dotenv.load(File.expand_path("../.env", __dir__))
 require "openapi_ruby"
 require "openapi_ruby/rspec"
 
+require_relative "../lib/schemas"
 require_relative "scratch"
 
 module RT
-  URL    = ENV.fetch("RT_URL", "https://rt.kremlin.email")
-  TOKEN  = ENV.fetch("RT_TOKEN", "")
-  MUTATE = ENV["RT_MUTATE"] == "1"
+  # The document, for the generated specs to declare from. Every lookup here
+  # is generic -- a path, a method, a status -- and the specs supply those.
+  DOC = Schemas::DOCUMENT
+
+  module_function
+
+  # The schema of a path or query parameter, as the document declares it.
+  def parameter_schema(path, name)
+    declared = (DOC.dig("paths", path, "parameters") || []) +
+               VERBS.flat_map { |verb| DOC.dig("paths", path, verb, "parameters") || [] }
+
+    found = declared.map { |parameter| resolve(parameter) }
+                    .find { |parameter| parameter["name"] == name }
+
+    Schemas.symbolize(Schemas.rewrite_refs(found&.fetch("schema", nil) || { "type" => "string" }))
+  end
+
+  # The request schema of one operation.
+  def body_schema(path, method)
+    schema = DOC.dig("paths", path, method.downcase, "requestBody", "content",
+                     "application/json", "schema")
+
+    Schemas.symbolize(Schemas.rewrite_refs(schema || {}))
+  end
+
+  # The schema of one response of one operation.
+  def response_schema(path, method, code)
+    schema = DOC.dig("paths", path, method.downcase, "responses", code, "content",
+                     "application/json", "schema")
+
+    Schemas.symbolize(Schemas.rewrite_refs(schema || {}))
+  end
+
+  # A shared parameter or response is declared once and referred to; a lookup
+  # has to follow that.
+  def resolve(node)
+    ref = node["$ref"]
+    return node unless ref
+
+    ref.sub("#/", "").split("/").reduce(DOC) { |document, step| document.fetch(step) }
+  end
+
+  VERBS = %w[get put post delete patch].freeze
+end
+
+module RT
+  URL      = ENV.fetch("RT_URL", "https://rt.kremlin.email")
+  TOKEN    = ENV.fetch("RT_TOKEN", "")
+  USER     = ENV.fetch("RT_USER", "")
+  PASSWORD = ENV.fetch("RT_PASSWORD", "")
+  MUTATE   = ENV["RT_MUTATE"] == "1"
 
   # openapi-ruby's test DSL goes through rack-test, which calls an app object
   # rather than opening a socket. This is that object, and all it does is
@@ -68,7 +117,15 @@ module RT
       method = env.fetch("REQUEST_METHOD").capitalize
       request = Net::HTTP.const_get(method).new(uri(env))
 
-      request["Authorization"] = "token #{TOKEN}"
+      # A token where there is one. The RT in docker-compose.yml has no
+      # tokens yet -- they are made in the UI -- so a username and password
+      # are accepted too, which is the other scheme this document describes.
+      if TOKEN.empty?
+        request.basic_auth(USER, PASSWORD)
+      else
+        request["Authorization"] = "token #{TOKEN}"
+      end
+
       request["Accept"] = "application/json"
 
       body = env["rack.input"]&.read.to_s
@@ -118,7 +175,9 @@ RSpec.configure do |config|
   end, type: :openapi)
 
   config.before(:suite) do
-    raise "RT_TOKEN is not set; see .env.example" if RT::TOKEN.empty?
+    if RT::TOKEN.empty? && RT::USER.empty?
+      raise "no credentials: set RT_TOKEN, or RT_USER and RT_PASSWORD. See .env.example"
+    end
   end
 
   # Whatever the mutating half made, taken back down -- even if it failed, and

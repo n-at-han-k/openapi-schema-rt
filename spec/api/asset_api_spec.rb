@@ -2,76 +2,89 @@
 #
 # GENERATED from request_tracker_rest2.yaml by bin/generate-specs. Do not edit.
 #
-# One example per operation the document describes, carrying what that
-# operation needs: which object to aim it at, and what to send. All of it is
-# decided by the generator from the document -- see
-# generators/rspec/src/rtrspec/RspecCodegen.java. spec_helper.rb knows nothing
-# about any particular endpoint.
+# openapi-ruby's DSL: each operation is DECLARED as the document describes it,
+# and run_test! makes the request against a real RT and validates what comes
+# back against that declaration. The declaration IS the document -- the schemas
+# are the document's own components -- so nothing here restates a schema and
+# nothing can drift from one.
+#
+# What each example needs (which object to aim it at, what to send, what has to
+# exist first) was worked out from the document by
+# generators/rspec/src/rtrspec/RspecCodegen.java. spec/openapi_helper.rb knows
+# nothing about any endpoint.
 
-require 'spec_helper'
+require "openapi_helper"
 
-RSpec.describe 'AssetApi' do
-  describe 'GET /asset/{id}' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'GET',
-        path:         '/asset/{id}',
-        operation_id: 'asset_id_get',
-        mutating:     false,
-        params:       { 'id' => '56' },
-        query:        nil,
-        body:         nil,
-        setup:        { method: 'POST', path: '/asset' }
-      )
+RSpec.describe "AssetApi", type: :openapi do
+  openapi_schema :request_tracker_rest2
+
+  path "/asset/{id}" do
+    parameter name: :id, in: :path, required: true,
+              schema: RT.parameter_schema("/asset/{id}", "id")
+
+    get "GET /asset/{id}" do
+      operationId "asset_id_get"
+      tags "Asset"
+
+      response 200, "Asset queried successfully." do
+        schema RT.response_schema("/asset/{id}", "get", "200")
+        let(:id) { '1' }
+        run_test!
+      end
+    end
+
+    put "PUT /asset/{id}" do
+      operationId "asset_id_put"
+      tags "Asset"
+      request_body required: true, content: {
+        "application/json" => { schema: RT.body_schema("/asset/{id}", "put") }
+      }
+
+      response 200, "This is returned pretty much always. You need to inspect the content to figure out what happened." do
+        schema RT.response_schema("/asset/{id}", "put", "200")
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:id) { scratch(:asset) }
+        let(:request_body) { {} }
+        run_test!
+      end
     end
   end
 
-  describe 'PUT /asset/{id}' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'PUT',
-        path:         '/asset/{id}',
-        operation_id: 'asset_id_put',
-        mutating:     true,
-        params:       { 'id' => scratch(:asset) },
-        query:        nil,
-        body:         {},
-        setup:        nil
-      )
+  path "/asset" do
+
+    post "POST /asset" do
+      operationId "asset_post"
+      tags "Asset"
+      request_body required: true, content: {
+        "application/json" => { schema: RT.body_schema("/asset", "post") }
+      }
+
+      response 201, "Asset created successfully." do
+        schema RT.response_schema("/asset", "post", "201")
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:request_body) { JSON.parse('{"Name":"nathans-laptop","Catalog":"Laptops","Status":"in-use"}') }
+        run_test!
+      end
     end
   end
 
-  describe 'POST /asset' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'POST',
-        path:         '/asset',
-        operation_id: 'asset_post',
-        mutating:     true,
-        params:       {},
-        query:        nil,
-        body:         JSON.parse('{"Name":"nathans-laptop","Catalog":"Laptops","Status":"in-use"}'),
-        setup:        nil
-      )
-    end
-  end
+  path "/assets" do
 
-  describe 'GET /assets' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'GET',
-        path:         '/assets',
-        operation_id: 'assets_get',
-        mutating:     false,
-        params:       {},
-        query:        'query=query_example',
-        body:         nil,
-        setup:        nil
-      )
+    get "GET /assets" do
+      operationId "assets_get"
+      tags "Asset"
+
+      response 200, "Assets queried successfully." do
+        schema RT.response_schema("/assets", "get", "200")
+        let(:query) { 'query_example' }
+        run_test!
+      end
     end
   end
 

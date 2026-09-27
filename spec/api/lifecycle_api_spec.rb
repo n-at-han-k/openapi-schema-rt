@@ -2,140 +2,155 @@
 #
 # GENERATED from request_tracker_rest2.yaml by bin/generate-specs. Do not edit.
 #
-# One example per operation the document describes, carrying what that
-# operation needs: which object to aim it at, and what to send. All of it is
-# decided by the generator from the document -- see
-# generators/rspec/src/rtrspec/RspecCodegen.java. spec_helper.rb knows nothing
-# about any particular endpoint.
+# openapi-ruby's DSL: each operation is DECLARED as the document describes it,
+# and run_test! makes the request against a real RT and validates what comes
+# back against that declaration. The declaration IS the document -- the schemas
+# are the document's own components -- so nothing here restates a schema and
+# nothing can drift from one.
+#
+# What each example needs (which object to aim it at, what to send, what has to
+# exist first) was worked out from the document by
+# generators/rspec/src/rtrspec/RspecCodegen.java. spec/openapi_helper.rb knows
+# nothing about any endpoint.
 
-require 'spec_helper'
+require "openapi_helper"
 
-RSpec.describe 'LifecycleApi' do
-  describe 'DELETE /lifecycle/{name}' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'DELETE',
-        path:         '/lifecycle/{name}',
-        operation_id: 'lifecycle_name_delete',
-        mutating:     true,
-        params:       { 'name' => scratch(:lifecycle) },
-        query:        nil,
-        body:         nil,
-        setup:        nil
-      )
+RSpec.describe "LifecycleApi", type: :openapi do
+  openapi_schema :request_tracker_rest2
+
+  path "/lifecycle/{name}" do
+    parameter name: :name, in: :path, required: true,
+              schema: RT.parameter_schema("/lifecycle/{name}", "name")
+
+    delete "DELETE /lifecycle/{name}" do
+      operationId "lifecycle_name_delete"
+      tags "Lifecycle"
+
+      response 204, "Success, no content." do
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:name) { scratch(:lifecycle) }
+        run_test!
+      end
+    end
+
+    get "GET /lifecycle/{name}" do
+      operationId "lifecycle_name_get"
+      tags "Lifecycle"
+
+      response 200, "Lifecycle queried successfully." do
+        schema RT.response_schema("/lifecycle/{name}", "get", "200")
+        let(:name) { 'default' }
+        run_test!
+      end
+    end
+
+    put "PUT /lifecycle/{name}" do
+      operationId "lifecycle_name_put"
+      tags "Lifecycle"
+      request_body required: true, content: {
+        "application/json" => { schema: RT.body_schema("/lifecycle/{name}", "put") }
+      }
+
+      response 200, "Lifecycle updated." do
+        schema RT.response_schema("/lifecycle/{name}", "put", "200")
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:name) { scratch(:lifecycle) }
+        let(:request_body) { {} }
+        run_test!
+      end
     end
   end
 
-  describe 'GET /lifecycle/{name}' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'GET',
-        path:         '/lifecycle/{name}',
-        operation_id: 'lifecycle_name_get',
-        mutating:     false,
-        params:       { 'name' => 'support' },
-        query:        nil,
-        body:         nil,
-        setup:        { method: 'POST', path: '/lifecycles' }
-      )
+  path "/lifecycle/{name}/maps" do
+    parameter name: :name, in: :path, required: true,
+              schema: RT.parameter_schema("/lifecycle/{name}/maps", "name")
+
+    get "GET /lifecycle/{name}/maps" do
+      operationId "lifecycle_name_maps_get"
+      tags "Lifecycle"
+
+      response 200, "Maps queried successfully." do
+        schema RT.response_schema("/lifecycle/{name}/maps", "get", "200")
+        let(:name) { 'default' }
+        run_test!
+      end
+    end
+
+    put "PUT /lifecycle/{name}/maps" do
+      operationId "lifecycle_name_maps_put"
+      tags "Lifecycle"
+      request_body required: true, content: {
+        "application/json" => { schema: RT.body_schema("/lifecycle/{name}/maps", "put") }
+      }
+
+      response 200, "Maps updated." do
+        schema RT.response_schema("/lifecycle/{name}/maps", "put", "200")
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:name) { scratch(:lifecycle) }
+        let(:request_body) { JSON.parse('Object') }
+        run_test!
+      end
     end
   end
 
-  describe 'GET /lifecycle/{name}/maps' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'GET',
-        path:         '/lifecycle/{name}/maps',
-        operation_id: 'lifecycle_name_maps_get',
-        mutating:     false,
-        params:       { 'name' => 'support' },
-        query:        nil,
-        body:         nil,
-        setup:        nil
-      )
+  path "/lifecycle/{name}/validate" do
+    parameter name: :name, in: :path, required: true,
+              schema: RT.parameter_schema("/lifecycle/{name}/validate", "name")
+
+    post "POST /lifecycle/{name}/validate" do
+      operationId "lifecycle_name_validate_post"
+      tags "Lifecycle"
+      request_body required: true, content: {
+        "application/json" => { schema: RT.body_schema("/lifecycle/{name}/validate", "post") }
+      }
+
+      response 200, "The configuration was checked." do
+        schema RT.response_schema("/lifecycle/{name}/validate", "post", "200")
+        let(:name) { 'default' }
+        let(:request_body) { {} }
+        run_test!
+      end
     end
   end
 
-  describe 'PUT /lifecycle/{name}/maps' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'PUT',
-        path:         '/lifecycle/{name}/maps',
-        operation_id: 'lifecycle_name_maps_put',
-        mutating:     true,
-        params:       { 'name' => scratch(:lifecycle) },
-        query:        nil,
-        body:         JSON.parse('Object'),
-        setup:        nil
-      )
-    end
-  end
+  path "/lifecycles" do
 
-  describe 'PUT /lifecycle/{name}' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'PUT',
-        path:         '/lifecycle/{name}',
-        operation_id: 'lifecycle_name_put',
-        mutating:     true,
-        params:       { 'name' => scratch(:lifecycle) },
-        query:        nil,
-        body:         {},
-        setup:        nil
-      )
-    end
-  end
+    get "GET /lifecycles" do
+      operationId "lifecycles_get"
+      tags "Lifecycle"
 
-  describe 'POST /lifecycle/{name}/validate' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'POST',
-        path:         '/lifecycle/{name}/validate',
-        operation_id: 'lifecycle_name_validate_post',
-        mutating:     false,
-        params:       { 'name' => 'support' },
-        query:        nil,
-        body:         {},
-        setup:        nil
-      )
+      response 200, "Lifecycles queried successfully." do
+        schema RT.response_schema("/lifecycles", "get", "200")
+        let(:type) { 'type_example' }
+        run_test!
+      end
     end
-  end
 
-  describe 'GET /lifecycles' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'GET',
-        path:         '/lifecycles',
-        operation_id: 'lifecycles_get',
-        mutating:     false,
-        params:       {},
-        query:        'type=type_example',
-        body:         nil,
-        setup:        nil
-      )
-    end
-  end
+    post "POST /lifecycles" do
+      operationId "lifecycles_post"
+      tags "Lifecycle"
+      request_body required: true, content: {
+        "application/json" => { schema: RT.body_schema("/lifecycles", "post") }
+      }
 
-  describe 'POST /lifecycles' do
-    it 'answers a documented status, with a body matching the schema' do
-      RT.verify(
-        example:      self,
-        method:       'POST',
-        path:         '/lifecycles',
-        operation_id: 'lifecycles_post',
-        mutating:     true,
-        params:       {},
-        query:        nil,
-        body:         {},
-        setup:        nil
-      )
+      response 201, "Lifecycle created successfully." do
+        schema RT.response_schema("/lifecycles", "post", "201")
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
+        before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
+        let(:request_body) { {} }
+        run_test!
+      end
     end
   end
 

@@ -1174,6 +1174,8 @@ components:
       name: id
       in: path
       required: true
+      # What a read aims at when it wants one of these: RT's initial data makes ticket 1 and queue 1.
+      example: 1
       description: The id of the object we are interested in
       schema:
         type: integer
@@ -1182,6 +1184,8 @@ components:
       name: idOrName
       in: path
       required: true
+      # The queue RT ships with, and the one name a read can rely on anywhere.
+      example: General
       description: Name or id of the resource.
       schema:
         oneOf:
@@ -1195,6 +1199,8 @@ components:
       in: path
       required: true
       description: Name of the resource. Lifecycles are addressed by name, not by id.
+      # `default` is the ticket lifecycle every RT ships with.
+      example: default
       schema:
         type: string
         example: support

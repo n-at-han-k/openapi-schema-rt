@@ -3,12 +3,13 @@
 # GENERATED from request_tracker_rest2.yaml by bin/generate-specs. Do not edit.
 #
 # openapi-ruby's DSL: each operation is DECLARED as the document describes it,
-# and run_test! makes the request and validates what comes back against that
-# declaration. The declaration is the document, so nothing here restates a
-# schema and nothing can drift from it.
+# and run_test! makes the request against a real RT and validates what comes
+# back against that declaration. The declaration IS the document -- the schemas
+# are the document's own components -- so nothing here restates a schema and
+# nothing can drift from one.
 #
-# What each example needs -- which object to aim it at, what to send, what has
-# to exist first -- was worked out from the document by
+# What each example needs (which object to aim it at, what to send, what has to
+# exist first) was worked out from the document by
 # generators/rspec/src/rtrspec/RspecCodegen.java. spec/openapi_helper.rb knows
 # nothing about any endpoint.
 
@@ -18,40 +19,42 @@ RSpec.describe "{{classname}}", type: :openapi do
   openapi_schema :request_tracker_rest2
 
 {{#operations}}
-{{#operation}}
+{{#paths}}
   path "{{path}}" do
-{{#pathParams}}
-    parameter name: :{{baseName}}, in: :path, required: true, schema: RT.parameter_schema("{{path}}", "{{baseName}}")
+{{#parameters}}
+    parameter name: :{{baseName}}, in: :path, required: true,
+              schema: RT.parameter_schema("{{path}}", "{{baseName}}")
+{{/parameters}}
+{{#operations}}
 
-{{/pathParams}}
-    {{httpMethod}}{{#summary}} "{{{summary}}}"{{/summary}}{{^summary}} "{{httpMethod}} {{path}}"{{/summary}} do
+    {{verb}} "{{{summary}}}" do
       operationId "{{operationId}}"
-{{#vendorExtensions.x-tags}}
+{{#tags}}
       tags "{{.}}"
-{{/vendorExtensions.x-tags}}
-{{#bodyParam}}
-      request_body required: {{required}}, content: {
-        "application/json" => { schema: RT.body_schema("{{path}}", "{{httpMethod}}") }
+{{/tags}}
+{{#hasBody}}
+      request_body required: {{bodyRequired}}, content: {
+        "application/json" => { schema: RT.body_schema("{{path}}", "{{verb}}") }
       }
-{{/bodyParam}}
+{{/hasBody}}
+{{#checked}}
 
-{{#vendorExtensions.x-checked}}
       response {{code}}, "{{{description}}}" do
 {{#hasSchema}}
-        schema RT.response_schema("{{path}}", "{{httpMethod}}", "{{code}}")
+        schema RT.response_schema("{{path}}", "{{verb}}", "{{code}}")
 {{/hasSchema}}
 {{#mutating}}
-        # This one writes. It is aimed at an object the suite makes and
-        # removes, never at anything that was in RT beforehand -- but it
-        # writes, so it runs only when asked for.
+        # This one writes. It is aimed at an object the suite makes and removes,
+        # never at anything that was in RT beforehand -- but it writes, so it
+        # runs only when asked for.
         before { skip("changes state; bin/test --mutate to include it") unless RT::MUTATE }
 {{/mutating}}
 {{#params}}
         let(:{{name}}) { {{{value}}} }
 {{/params}}
 {{#hasSetup}}
-        # What has to exist before this is worth calling, from the document's
-        # own link between the two operations.
+        # What has to exist first, from the document's own link between the two
+        # operations: RT answers 500 to a revoke of a right it never granted.
         before { RT.setup("{{{setupMethod}}}", "{{{setupPath}}}", {{{setupParams}}}) }
 {{/hasSetup}}
 {{#hasBody}}
@@ -59,10 +62,11 @@ RSpec.describe "{{classname}}", type: :openapi do
 {{/hasBody}}
         run_test!
       end
-{{/vendorExtensions.x-checked}}
+{{/checked}}
     end
+{{/operations}}
   end
 
-{{/operation}}
+{{/paths}}
 {{/operations}}
 end

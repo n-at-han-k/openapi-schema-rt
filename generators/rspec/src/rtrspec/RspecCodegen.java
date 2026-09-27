@@ -137,16 +137,63 @@ public class RspecCodegen extends RubyClientCodegen {
     public OperationsMap postProcessOperationsWithModels(OperationsMap objs, List<ModelMap> allModels) {
         OperationsMap processed = super.postProcessOperationsWithModels(objs, allModels);
 
+        // openapi-ruby declares operations inside ONE `path` block per path, so
+        // the operations are regrouped here: openapi-generator hands them over
+        // grouped by tag, in whatever order it read them.
+        Map<String, List<Map<String, Object>>> byPath = new LinkedHashMap<>();
+        Map<String, List<Map<String, Object>>> paramsByPath = new LinkedHashMap<>();
+
         for (CodegenOperation op : processed.getOperations().getOperation()) {
             String method = op.httpMethod.toUpperCase(Locale.ROOT);
             boolean mutating = method.equals("PUT") || method.equals("PATCH")
                     || method.equals("DELETE")
                     || (method.equals("POST") && answers(op, "201"));
 
-            op.vendorExtensions.put("x-tags", op.tags == null ? List.of()
+            Map<String, Object> declared = new LinkedHashMap<>();
+            declared.put("verb", method.toLowerCase(Locale.ROOT));
+            declared.put("summary", op.summary != null && !op.summary.isEmpty()
+                    ? op.summary.replace("\"", "'")
+                    : method + " " + op.path);
+            declared.put("operationId", op.operationId);
+            declared.put("tags", op.tags == null ? List.of()
                     : op.tags.stream().map(tag -> tag.getName()).toList());
-            op.vendorExtensions.put("x-checked", List.of(checked(op, allModels, mutating)));
+            declared.put("hasBody", op.bodyParam != null);
+            declared.put("bodyRequired", op.bodyParam != null && op.bodyParam.required);
+            declared.put("path", op.path);
+            declared.put("checked", List.of(checked(op, allModels, mutating)));
+
+            byPath.computeIfAbsent(op.path, key -> new ArrayList<>()).add(declared);
+
+            // The path's own parameters, declared once above its operations.
+            List<Map<String, Object>> shared =
+                    paramsByPath.computeIfAbsent(op.path, key -> new ArrayList<>());
+            if (op.pathParams != null) {
+                for (CodegenParameter param : op.pathParams) {
+                    boolean seen = shared.stream()
+                            .anyMatch(entry -> param.baseName.equals(entry.get("baseName")));
+                    if (seen) {
+                        continue;
+                    }
+
+                    Map<String, Object> entry = new LinkedHashMap<>();
+                    entry.put("baseName", param.baseName);
+                    entry.put("paramName", param.paramName);
+                    entry.put("path", op.path);
+                    shared.add(entry);
+                }
+            }
         }
+
+        List<Map<String, Object>> paths = new ArrayList<>();
+        byPath.forEach((path, operations) -> {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("path", path);
+            entry.put("parameters", paramsByPath.getOrDefault(path, List.of()));
+            entry.put("operations", operations);
+            paths.add(entry);
+        });
+
+        processed.getOperations().put("paths", paths);
 
         return processed;
     }
@@ -173,7 +220,7 @@ public class RspecCodegen extends RubyClientCodegen {
         if (op.pathParams != null) {
             for (CodegenParameter param : op.pathParams) {
                 Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("name", param.paramName);
+                entry.put("name", param.baseName);
                 entry.put("value", mutating
                         ? scratchFor(op.path, param.baseName)
                         : literal(example(param)));
@@ -187,7 +234,7 @@ public class RspecCodegen extends RubyClientCodegen {
                     continue;
                 }
                 Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("name", param.paramName);
+                entry.put("name", param.baseName);
                 entry.put("value", literal(value));
                 params.add(entry);
             }
@@ -199,6 +246,18 @@ public class RspecCodegen extends RubyClientCodegen {
         checked.put("body", body);
 
         String setup = setupFor.get(op.operationId);
+
+        // A link says one operation leads to another, which is not the same as
+        // being its precondition: upstream links a queue's create to its
+        // delete, and the delete needs no help. What a revoke needs is the
+        // GRANT, and the grant's path is a prefix of the revoke's -- that is
+        // the shape worth acting on.
+        if (setup != null
+                && (!"DELETE".equals(op.httpMethod.toUpperCase(Locale.ROOT))
+                    || !op.path.startsWith(setup.split("\\|")[1] + "/"))) {
+            setup = null;
+        }
+
         checked.put("hasSetup", setup != null);
         if (setup != null) {
             checked.put("setupMethod", setup.split("\\|")[0]);
