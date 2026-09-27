@@ -1,0 +1,35 @@
+# The values this suite reads. It talks to a REAL RT, so nothing is invented:
+# an id here is one you are content for a GET to touch.
+#
+# A path parameter with no value here skips its examples rather than guessing
+# -- a 404 that passes because 404 is documented proves nothing.
+params:
+  id: 1
+  idOrName: General
+  name: default
+  principalId: 1
+  groupId: 1
+  valueId: 1
+  right: ShowTicket
+
+paths:
+  # The searches: RT answers 400 without a query, and a 400 is documented, so
+  # an empty request would pass while checking nothing.
+  /tickets:
+    query: query=id>0
+  /users:
+    body: [{ field: Name, operator: LIKE, value: root }]
+  /groups:
+    body: [{ field: Name, operator: LIKE, value: "" }]
+  /customfields:
+    body: [{ field: Name, operator: LIKE, value: "" }]
+  /articles:
+    body: [{ field: Name, operator: LIKE, value: "" }]
+  /customroles:
+    body: [{ field: Name, operator: LIKE, value: "" }]
+  /assets:
+    query: query=id>0
+  /customfield/{id}/values:
+    params: { id: 2 }
+  /customfield/{id}/value/{valueId}:
+    params: { id: 2 }

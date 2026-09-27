@@ -6,7 +6,7 @@ openapi: "3.1.0"
 info:
   title: Request Tracker REST2
   description: Partial specification of Request Tracker's REST2 API.
-  version: "0.3.1"
+  version: "0.3.2"
   contact:
     name: Iisakki Jaakkola
     email: iihaja@utu.fi
@@ -247,8 +247,10 @@ components:
           type: integer
           minimum: 0
       required:
+        # NOT `pages`: RT leaves it out entirely when the collection is empty.
+        # `GET /customfield/2/values` on a field with no values answers
+        # {"count":0,"items":[],"page":1,"per_page":20,"total":0}.
         - page
-        - pages
         - per_page
         - count
         - total
@@ -656,6 +658,32 @@ components:
             - id
             - type
     # Fields
+    customFieldsApplied:
+      type: array
+      description: The custom fields applied to an object, as a queue lists the
+        ones its tickets have. No values -- these are the fields themselves.
+      items:
+        type: object
+        properties:
+          id:
+            # Quoted here, unlike the unquoted one a queue gives for itself.
+            anyOf:
+              - type: integer
+              - type: string
+          name:
+            type: string
+          ref:
+            type: string
+            enum:
+              - customfield
+          type:
+            $ref: '#/components/schemas/constantCustomField'
+          _url:
+            $ref: '#/components/schemas/url'
+        required:
+          - id
+          - name
+          - _url
     customFieldsArray:
       type: array
       description: Customfields with their values, as returned by the server.
@@ -1016,10 +1044,16 @@ components:
           additionalProperties:
             type: string
         actions:
-          description: The transitions offered in the UI.
+          # A FLAT array that alternates: the string "new -> open", then the
+          # object configuring it, then the next string. Not a list of
+          # objects, which is what it looks like from the UI.
+          description: The transitions offered in the UI, as alternating
+            "from -> to" strings and their configuration.
           type: array
           items:
-            type: object
+            anyOf:
+              - type: string
+              - type: object
         colors:
           description: A colour per status, as shown in the UI.
           type: object
@@ -1062,6 +1096,23 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/rightGrant'
+    principalReference:
+      description: A principal as a RIGHTS listing spells it, which is not how
+        the rest of the API spells one. `GET /global/rights` answers
+        `{"id":6,"_url":"..."}` -- the id unquoted, and no `type` at all.
+      type: object
+      properties:
+        id:
+          anyOf:
+            - type: integer
+            - type: string
+        Name:
+          type: string
+        _url:
+          $ref: '#/components/schemas/url'
+      required:
+        - id
+        - _url
     rightsList:
       description: The rights granted on an object, one entry per principal.
       type: object
@@ -1077,9 +1128,9 @@ components:
                   Right:
                     type: string
                   Group:
-                    $ref: '#/components/schemas/groupReference'
+                    $ref: '#/components/schemas/principalReference'
                   User:
-                    $ref: '#/components/schemas/userReference'
+                    $ref: '#/components/schemas/principalReference'
   parameters:
     id:
       name: id
@@ -1198,8 +1249,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/userReference'
-                    required:
-                      - items
         "401":
           $ref: '#/components/responses/401'
         default:
@@ -1523,8 +1572,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/groupReference'
-                    required:
-                      - items
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -1781,8 +1828,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/queueReference'
-                    required:
-                      - items
         "401":
           $ref: '#/components/responses/401'
         default:
@@ -1889,7 +1934,10 @@ paths:
                       Description:
                         type: string
                       TicketCustomFields:
-                        $ref: '#/components/schemas/customFieldsArray'
+                        # The FIELDS, not their values: each entry carries
+                        # `ref: customfield` and no `values`, which is the
+                        # other way round from customFieldsArray.
+                        $ref: '#/components/schemas/customFieldsApplied'
                       CommentAddress:
                         type: string
                         description: May be empty.
@@ -2043,8 +2091,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/ticketReference'
-                    required:
-                      - items
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -2294,8 +2340,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/customFieldReference'
-                    required:
-                      - items
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -2517,8 +2561,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/catalogReference'
-                    required:
-                      - items
         "401":
           $ref: '#/components/responses/401'
         default:
@@ -2650,8 +2692,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/classReference'
-                    required:
-                      - items
         "401":
           $ref: '#/components/responses/401'
         default:
@@ -2780,8 +2820,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/assetReference'
-                    required:
-                      - items
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -2940,8 +2978,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/articleReference'
-                    required:
-                      - items
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -3093,8 +3129,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/genericObject'
-                    required:
-                      - items
         "400":
           $ref: '#/components/responses/400'
         "401":
@@ -3146,16 +3180,19 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/paginated'
-                  - type: object
-                    properties:
-                      items:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/lifecycleReference'
-                    required:
-                      - items
+                # A bare ARRAY, not a paginated envelope: lifecycles are
+                # configuration rather than records, and RT hands back every
+                # one of them with its whole configuration inline.
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/lifecycleConfiguration'
+                    - type: object
+                      properties:
+                        Name:
+                          type: string
+                        _url:
+                          $ref: '#/components/schemas/url'
         "401":
           $ref: '#/components/responses/401'
         default:
@@ -3374,8 +3411,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/genericObject'
-                    required:
-                      - items
         "401":
           $ref: '#/components/responses/401'
         "404":
@@ -3554,10 +3589,14 @@ paths:
           content:
             application/json:
               schema:
+                # category -> { right name: what it lets you do }. RT answers
+                # a MAP of descriptions here, e.g.
+                # {"General":{"CreateTicket":"Create tickets"}}, not a list of
+                # right names.
                 type: object
                 additionalProperties:
-                  type: array
-                  items:
+                  type: object
+                  additionalProperties:
                     type: string
         "401":
           $ref: '#/components/responses/401'
@@ -3725,10 +3764,14 @@ paths:
           content:
             application/json:
               schema:
+                # category -> { right name: what it lets you do }. RT answers
+                # a MAP of descriptions here, e.g.
+                # {"General":{"CreateTicket":"Create tickets"}}, not a list of
+                # right names.
                 type: object
                 additionalProperties:
-                  type: array
-                  items:
+                  type: object
+                  additionalProperties:
                     type: string
         "401":
           $ref: '#/components/responses/401'
@@ -3896,10 +3939,14 @@ paths:
           content:
             application/json:
               schema:
+                # category -> { right name: what it lets you do }. RT answers
+                # a MAP of descriptions here, e.g.
+                # {"General":{"CreateTicket":"Create tickets"}}, not a list of
+                # right names.
                 type: object
                 additionalProperties:
-                  type: array
-                  items:
+                  type: object
+                  additionalProperties:
                     type: string
         "401":
           $ref: '#/components/responses/401'
@@ -4067,10 +4114,14 @@ paths:
           content:
             application/json:
               schema:
+                # category -> { right name: what it lets you do }. RT answers
+                # a MAP of descriptions here, e.g.
+                # {"General":{"CreateTicket":"Create tickets"}}, not a list of
+                # right names.
                 type: object
                 additionalProperties:
-                  type: array
-                  items:
+                  type: object
+                  additionalProperties:
                     type: string
         "401":
           $ref: '#/components/responses/401'
@@ -4238,10 +4289,14 @@ paths:
           content:
             application/json:
               schema:
+                # category -> { right name: what it lets you do }. RT answers
+                # a MAP of descriptions here, e.g.
+                # {"General":{"CreateTicket":"Create tickets"}}, not a list of
+                # right names.
                 type: object
                 additionalProperties:
-                  type: array
-                  items:
+                  type: object
+                  additionalProperties:
                     type: string
         "401":
           $ref: '#/components/responses/401'
@@ -4405,10 +4460,14 @@ paths:
           content:
             application/json:
               schema:
+                # category -> { right name: what it lets you do }. RT answers
+                # a MAP of descriptions here, e.g.
+                # {"General":{"CreateTicket":"Create tickets"}}, not a list of
+                # right names.
                 type: object
                 additionalProperties:
-                  type: array
-                  items:
+                  type: object
+                  additionalProperties:
                     type: string
         "401":
           $ref: '#/components/responses/401'

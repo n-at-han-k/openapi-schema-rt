@@ -1,28 +1,26 @@
-stages:
-  - test
-  - release
+.ruby: &ruby
+  variables:
+    LANG: "C.UTF-8"
+  before_script:
+    - ruby -v
+    - bundle config set --local deployment true
+    - bundle install -j $(nproc)
+  parallel:
+    matrix:
+      - RUBY_VERSION: ['2.7', '3.0', '3.1']
+  image: "ruby:$RUBY_VERSION"
+  cache:
+    paths:
+      - vendor/ruby
+    key: 'ruby-$RUBY_VERSION'
 
-lint:
-  stage: test
-  # Check for updates: https://hub.docker.com/r/dshanley/vacuum/tags
-  image: 
-    name: dshanley/vacuum:v0.8.5@sha256:6d396c7e21aba0890ea764836f1fe8a8c629a184e2addc298492e8fa06d22392
-    # Disable the default entrypoint.
-    entrypoint: [""]
+gem:
+  extends: .ruby
   script:
-    # The tool used is this: https://quobix.com/vacuum/
-    - vacuum lint --details request_tracker_rest2.yaml
+    - bundle exec rspec
+    - bundle exec rake build
+    - bundle exec rake install
+  artifacts:
+    paths:
+      - pkg/*.gem
 
-
-# Make a new release when new semver tags are pushed.
-release:
-  stage: release
-  image: registry.gitlab.com/gitlab-org/release-cli:latest
-  rules:
-    # Run this job when a simple semantic version tag is created.
-    - if: $CI_COMMIT_TAG =~ /^[0-9]+\.[0-9]+\.[0-9]+$/
-  script:
-    - echo "Making a release"
-  release:
-    tag_name: '$CI_COMMIT_TAG'
-    description: '$CI_COMMIT_TAG_MESSAGE'
